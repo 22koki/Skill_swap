@@ -21,6 +21,117 @@ export default function SwapRequestCard({ swap, currentUserId, onAction, onSched
   const initials = personName?.split(" ").map(part => part[0]).join("").slice(0,2).toUpperCase() || "SS";
   const rating = Number(personProfile?.average_rating || 0).toFixed(1);
 
+  if (swap.status === "accepted") {
+    return (
+      <article className="accepted-bridge-card glass">
+        <div className="bridge-bg-orb bridge-bg-one" />
+        <div className="bridge-bg-orb bridge-bg-two" />
+
+        <div className="accepted-bridge-head">
+          <div className="request-person premium-person">
+            <div className="avatar-shell bridge-avatar-shell">
+              {personProfile?.avatar_url
+                ? <img className="request-avatar" src={personProfile.avatar_url} alt="" />
+                : <div className="request-avatar request-avatar-fallback">{initials}</div>}
+              <span className="presence-dot" />
+            </div>
+            <div>
+              <div className="request-kicker">Accepted SkillSwap</div>
+              <h3>{personName}</h3>
+              <div className="person-stats">
+                <span>⭐ {rating}</span>
+                {personProfile?.location && <span>📍 {personProfile.location}</span>}
+                <span>↻ {personProfile?.completed_swaps || 0} swaps</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="accepted-meta">
+            <span className="accepted-badge">✓ Accepted</span>
+            <small>{relativeTime(swap.created_at)}</small>
+          </div>
+        </div>
+
+        <div className="exchange-bridge-scene">
+          <div className={"bridge-side bridge-side-left " + learnVisual.className}>
+            <div className="bridge-side-label">You learn</div>
+            <div className="bridge-skill-icon">{learnVisual.icon}</div>
+            <div className="bridge-side-copy">
+              <small>From {personName}</small>
+              <strong>{theyTeach}</strong>
+            </div>
+          </div>
+
+          <div className="bridge-center">
+            <div className="energy-bridge bridge-forward">
+              <span className="energy-dot dot-a"></span>
+              <span className="energy-dot dot-b"></span>
+              <span className="energy-dot dot-c"></span>
+            </div>
+
+            <div className="bridge-core">
+              <div className="bridge-core-halo halo-one"></div>
+              <div className="bridge-core-halo halo-two"></div>
+              <div className="bridge-core-icon">⇄</div>
+              <span>SKILL SWAP</span>
+              <small>{theyTeach} ↔ {youTeach}</small>
+            </div>
+
+            <div className="energy-bridge bridge-backward">
+              <span className="energy-dot dot-a"></span>
+              <span className="energy-dot dot-b"></span>
+              <span className="energy-dot dot-c"></span>
+            </div>
+
+            <div className="bridge-flight-chip chip-out">
+              <span>{teachVisual.icon}</span>{youTeach}<b>→</b>
+            </div>
+            <div className="bridge-flight-chip chip-in">
+              <b>←</b><span>{learnVisual.icon}</span>{theyTeach}
+            </div>
+          </div>
+
+          <div className={"bridge-side bridge-side-right " + teachVisual.className}>
+            <div className="bridge-side-label">You teach</div>
+            <div className="bridge-skill-icon">{teachVisual.icon}</div>
+            <div className="bridge-side-copy">
+              <small>In return</small>
+              <strong>{youTeach}</strong>
+            </div>
+          </div>
+        </div>
+
+        {swap.message && (
+          <div className="bridge-message">
+            <span>“</span>
+            <p>{swap.message}</p>
+          </div>
+        )}
+
+        <div className="bridge-footer">
+          <div className="bridge-progress">
+            <span className="bridge-progress-dot done">✓</span>
+            <i></i>
+            <span className="bridge-progress-dot done">✓</span>
+            <i></i>
+            <span className={"bridge-progress-dot " + (booking ? "done" : "active")}>{booking ? "✓" : "3"}</span>
+            <div className="bridge-progress-labels">
+              <small>Matched</small>
+              <small>Accepted</small>
+              <small>{booking ? "Scheduled" : "Schedule"}</small>
+            </div>
+          </div>
+
+          <div className="request-actions bridge-actions">
+            {!booking
+              ? <button className="primary bridge-schedule-button" onClick={() => onSchedule(swap)}>Schedule session →</button>
+              : <a className="outline booking-jump" href="#bookings">View booking ↓</a>}
+          </div>
+        </div>
+      </article>
+    );
+  }
+
   return (
     <article className={"swap-request-card swap-pass glass status-" + swap.status}>
       <div className="swap-pass-aura aura-one" />
