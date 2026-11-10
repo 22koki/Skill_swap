@@ -84,8 +84,8 @@ class MatchListView(APIView):
                 "average_rating": float(profile.average_rating),
                 "completed_swaps": profile.completed_swaps,
                 "score": score,
-                "they_teach_me": list(Skill.objects.filter(id__in=they_teach_me).values_list("name", flat=True)),
-                "i_teach_them": list(Skill.objects.filter(id__in=i_teach_them).values_list("name", flat=True)),
+                "they_teach_me": list(Skill.objects.filter(id__in=they_teach_me).values("id", "name")),
+                "i_teach_them": list(Skill.objects.filter(id__in=i_teach_them).values("id", "name")),
             })
 
         results.sort(key=lambda item: (-item["score"], -item["average_rating"], -item["completed_swaps"]))
