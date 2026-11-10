@@ -525,7 +525,7 @@ export default function App(){
 
   {user && <RequestsPanel swaps={swaps} bookings={bookings} currentUserId={user.id} currentUser={user} onAction={handleSwapAction} onSchedule={openSchedule} />}
 
-  {user && <BookingsPanel bookings={bookings} onAction={handleBookingAction} />}
+  {user && <BookingsPanel bookings={bookings} currentUser={user} onAction={handleBookingAction} />}
 
   <section id="how" className="how glass">
    <div className="eyebrow">THREE SIMPLE MOVES</div><h2>Your knowledge is your currency.</h2>
