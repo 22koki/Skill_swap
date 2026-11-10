@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import SwapRequestCard from "./SwapRequestCard";
 
-export default function RequestsPanel({ swaps, bookings, currentUserId, currentUser, onAction, onSchedule }) {
+export default function RequestsPanel({ swaps, bookings, currentUserId, currentUser, onAction, onSchedule, onMessage }) {
   const [tab, setTab] = useState("incoming");
 
   const groups = useMemo(() => ({
@@ -52,6 +52,7 @@ export default function RequestsPanel({ swaps, bookings, currentUserId, currentU
             currentUser={currentUser}
             onAction={onAction}
             onSchedule={onSchedule}
+            onMessage={onMessage}
             booking={bookings.find(b=>b.swap===swap.id && b.status==="scheduled")}
           />
         )) : (
