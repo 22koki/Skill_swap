@@ -22,7 +22,7 @@ class Migration(migrations.Migration):
                 ("status", models.CharField(choices=[("scheduled","Scheduled"),("cancelled","Cancelled"),("completed","Completed")], default="scheduled", max_length=16)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
-                ("swap", models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name="booking", to="swaps.swap")),
+                ("swap", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="bookings", to="swaps.swap")),
             ],
             options={"ordering":["starts_at"]},
         ),
