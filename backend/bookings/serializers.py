@@ -4,13 +4,15 @@ from .models import Booking
 
 class BookingSerializer(serializers.ModelSerializer):
     partner_name = serializers.SerializerMethodField()
+    partner_profile = serializers.SerializerMethodField()
     learn_skill_name = serializers.SerializerMethodField()
     teach_skill_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
         fields = [
-            "id", "swap", "partner_name", "learn_skill_name", "teach_skill_name",
+            "id", "swap", "partner_name", "partner_profile",
+            "learn_skill_name", "teach_skill_name",
             "starts_at", "duration_minutes", "mode", "meeting_link",
             "location_note", "note", "status", "created_at", "updated_at",
         ]
@@ -25,6 +27,23 @@ class BookingSerializer(serializers.ModelSerializer):
     def get_partner_name(self, obj):
         partner = self._partner(obj)
         return (partner.get_full_name() or partner.username) if partner else ""
+
+    def get_partner_profile(self, obj):
+        partner = self._partner(obj)
+        profile = getattr(partner, "profile", None) if partner else None
+        if not profile:
+            return {
+                "avatar_url": "",
+                "location": "",
+                "average_rating": 0,
+                "completed_swaps": 0,
+            }
+        return {
+            "avatar_url": profile.avatar_url,
+            "location": profile.location,
+            "average_rating": float(profile.average_rating),
+            "completed_swaps": profile.completed_swaps,
+        }
 
     def get_learn_skill_name(self, obj):
         request = self.context.get("request")
