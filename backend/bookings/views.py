@@ -47,6 +47,8 @@ class BookingActionView(APIView):
             booking.status = Booking.Status.CANCELLED
         elif action == "complete":
             booking.status = Booking.Status.COMPLETED
+            booking.swap.status = "completed"
+            booking.swap.save(update_fields=["status", "updated_at"])
         else:
             return Response({"detail": "Unknown booking action."}, status=400)
 
