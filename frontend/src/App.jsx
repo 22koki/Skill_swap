@@ -312,15 +312,33 @@ export default function App(){
  function openProposal(match){
   if(!token){ setAuthMode("login"); setAuthOpen(true); return; }
   if(match.preview){ setNotice("Preview card only. Add your skills and click Find my match to get real users."); setSkillsOpen(true); return; }
-  const offered=match.i_teach_them?.[0]?.id||"";
-  const requested=match.they_teach_me?.[0]?.id||"";
+
+  const mutualOffer=match.i_teach_them?.[0];
+  const mutualRequest=match.they_teach_me?.[0];
+
+  if(!mutualOffer || !mutualRequest){
+   setNotice("This is a one-way match. Add a skill they want before proposing a swap.");
+   setSkillsOpen(true);
+   return;
+  }
+
   setSelectedMatch(match);
-  setProposalForm({offered_skill:String(offered),requested_skill:String(requested),message:"Hey! I’d love to swap skills with you."});
+  setProposalForm({
+   offered_skill:String(mutualOffer.id),
+   requested_skill:String(mutualRequest.id),
+   message:"Hey! I’d love to swap skills with you."
+  });
   setProposalOpen(true);
  }
 
  async function submitProposal(e){
   e.preventDefault();
+
+  if(!selectedMatch || !proposalForm.offered_skill || !proposalForm.requested_skill){
+   setNotice("Choose a valid two-way skill exchange before sending.");
+   return;
+  }
+
   const res=await api("/swaps/",{method:"POST",body:JSON.stringify({
    recipient:selectedMatch.user_id,
    offered_skill:Number(proposalForm.offered_skill),
@@ -420,7 +438,9 @@ export default function App(){
     <p><b>Can teach you</b> {m.teaches}</p>
     <p><b>You can teach</b> {m.wants}</p>
     <small>⭐ {m.rating} · {m.swaps} successful swaps</small>
-    <button className="primary mini" onClick={()=>openProposal(m)}>Propose swap ↗</button>
+    {m.preview || (m.i_teach_them?.length && m.they_teach_me?.length)
+      ? <button className="primary mini" onClick={()=>openProposal(m)}>Propose swap ↗</button>
+      : <button className="outline mini partial-match-button" onClick={()=>openProposal(m)}>One-way match · Add mutual skill</button>}
    </article>)}</div> :
    <div className="empty-state glass"><div>🧭</div><h3>No matches yet</h3><p>Add more teach/learn skills to improve your chances.</p><button className="primary" onClick={()=>setSkillsOpen(true)}>Add skills</button></div>}
   </section>
