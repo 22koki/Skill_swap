@@ -11,7 +11,7 @@ class Booking(models.Model):
         CANCELLED = "cancelled", "Cancelled"
         COMPLETED = "completed", "Completed"
 
-    swap = models.OneToOneField(Swap, on_delete=models.CASCADE, related_name="booking")
+    swap = models.ForeignKey(Swap, on_delete=models.CASCADE, related_name="bookings")
     starts_at = models.DateTimeField()
     duration_minutes = models.PositiveIntegerField(default=60)
     mode = models.CharField(max_length=16, choices=Mode.choices, default=Mode.ONLINE)
