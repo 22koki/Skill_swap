@@ -445,7 +445,7 @@ export default function App(){
    <div className="empty-state glass"><div>🧭</div><h3>No matches yet</h3><p>Add more teach/learn skills to improve your chances.</p><button className="primary" onClick={()=>setSkillsOpen(true)}>Add skills</button></div>}
   </section>
 
-  {user && <RequestsPanel swaps={swaps} bookings={bookings} currentUserId={user.id} onAction={handleSwapAction} onSchedule={openSchedule} />}
+  {user && <RequestsPanel swaps={swaps} bookings={bookings} currentUserId={user.id} currentUser={user} onAction={handleSwapAction} onSchedule={openSchedule} />}
 
   {user && <BookingsPanel bookings={bookings} onAction={handleBookingAction} />}
 
