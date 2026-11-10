@@ -10,7 +10,7 @@ function relativeTime(value) {
   return days === 1 ? "Yesterday" : days + " days ago";
 }
 
-export default function SwapRequestCard({ swap, currentUserId, currentUser, onAction, onSchedule, booking }) {
+export default function SwapRequestCard({ swap, currentUserId, currentUser, onAction, onSchedule, onMessage, booking }) {
   const incoming = swap.recipient === currentUserId;
   const personName = incoming ? swap.requester_name : swap.recipient_name;
   const personProfile = incoming ? swap.requester_profile : swap.recipient_profile;
@@ -126,9 +126,12 @@ export default function SwapRequestCard({ swap, currentUserId, currentUser, onAc
             <span>{booking ? "Session scheduled" : "Your match is ready"}</span>
             <small>{booking ? "Open the booking to view the session details." : "Schedule the first SkillSwap session."}</small>
           </div>
-          {!booking
-            ? <button className="primary showcase-cta" onClick={()=>onSchedule(swap)}>Schedule session →</button>
-            : <a className="outline booking-jump" href="#bookings">View booking ↓</a>}
+          <div className="showcase-footer-actions">
+            <button className="outline message-partner-button" onClick={()=>onMessage(swap.id)}>💬 Message</button>
+            {!booking
+              ? <button className="primary showcase-cta" onClick={()=>onSchedule(swap)}>Schedule session →</button>
+              : <a className="outline booking-jump" href="#bookings">View booking ↓</a>}
+          </div>
         </div>
       </article>
     );
