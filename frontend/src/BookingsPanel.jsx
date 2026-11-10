@@ -2,12 +2,20 @@ import { getSkillVisual } from "./skillVisuals";
 
 function formatDate(value){
   if(!value) return "";
-  return new Intl.DateTimeFormat(undefined,{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(value));
+  return new Intl.DateTimeFormat(undefined,{
+    weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"
+  }).format(new Date(value));
 }
 
-export default function BookingsPanel({ bookings, onAction }) {
+export default function BookingsPanel({ bookings, currentUser, onAction }) {
   const upcoming=bookings.filter(b=>b.status==="scheduled");
   if(!upcoming.length) return null;
+
+  const meName=currentUser
+    ? ((currentUser.first_name||currentUser.username)+(currentUser.last_name?" "+currentUser.last_name:""))
+    : "You";
+  const meProfile=currentUser?.profile||{};
+  const meInitials=meName.split(" ").map(x=>x[0]).join("").slice(0,2).toUpperCase()||"YOU";
 
   return (
     <section id="bookings" className="bookings-section section">
@@ -24,38 +32,107 @@ export default function BookingsPanel({ bookings, onAction }) {
         {upcoming.map(booking=>{
           const learn=getSkillVisual(booking.learn_skill_name);
           const teach=getSkillVisual(booking.teach_skill_name);
+          const partner=booking.partner_profile||{};
+          const partnerName=booking.partner_name||"SkillSwap partner";
+          const partnerInitials=partnerName.split(" ").map(x=>x[0]).join("").slice(0,2).toUpperCase()||"SS";
+
           return (
-            <article className="booking-card glass" key={booking.id}>
-              <div className="booking-card-top">
+            <article className="booking-profile-rich glass" key={booking.id}>
+              <div className="bpr-topline">
                 <div>
-                  <div className="booking-kicker">WITH {booking.partner_name?.toUpperCase()}</div>
+                  <div className="booking-kicker">WITH {partnerName.toUpperCase()}</div>
                   <h3>{booking.learn_skill_name} ↔ {booking.teach_skill_name}</h3>
                 </div>
                 <span className="booking-status">Scheduled</span>
               </div>
 
-              <div className="booking-skills">
-                <div className={learn.className}><span>{learn.icon}</span><small>Learn</small><b>{booking.learn_skill_name}</b></div>
-                <div className="booking-mini-swap">⇄</div>
-                <div className={teach.className}><span>{teach.icon}</span><small>Teach</small><b>{booking.teach_skill_name}</b></div>
-              </div>
-
-              <div className="booking-details">
-                <div><span>📅</span><p><small>Date & time</small><b>{formatDate(booking.starts_at)}</b></p></div>
-                <div><span>⏱</span><p><small>Duration</small><b>{booking.duration_minutes} min</b></p></div>
-                <div><span>{booking.mode==="online"?"💻":"📍"}</span><p><small>Session</small><b>{booking.mode==="online"?"Online":"In person"}</b></p></div>
-              </div>
-
-              {booking.note && <div className="booking-note">“{booking.note}”</div>}
-
-              <div className="booking-footer">
-                <div>
-                  {booking.mode==="online" && booking.meeting_link && <a className="outline booking-link" href={booking.meeting_link} target="_blank" rel="noreferrer">Open meeting ↗</a>}
-                  {booking.mode==="in_person" && booking.location_note && <span className="location-chip">📍 {booking.location_note}</span>}
+              <div className="bpr-main">
+                <div className="bpr-person">
+                  <div className="bpr-avatar-shell">
+                    {meProfile.avatar_url
+                      ? <img src={meProfile.avatar_url} className="bpr-avatar" alt="" />
+                      : <div className="bpr-avatar bpr-avatar-fallback">{meInitials}</div>}
+                    <span className="presence-dot"></span>
+                  </div>
+                  <div className="bpr-person-copy">
+                    <h4>{meName}</h4>
+                    <p>Learner · Teacher</p>
+                    <div className="bpr-person-stats">
+                      <span>⭐ {Number(meProfile.average_rating||0).toFixed(1)}</span>
+                      <span>↻ {meProfile.completed_swaps||0} swaps</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="booking-actions">
+
+                <div className="bpr-exchange">
+                  <div className={"bpr-skill-chip "+learn.className}>
+                    <span>{learn.icon}</span><b>{booking.learn_skill_name}</b>
+                  </div>
+
+                  <div className="bpr-core">
+                    <div className="bpr-core-ring ring-1"></div>
+                    <div className="bpr-core-ring ring-2"></div>
+                    <div className="bpr-core-icon">⇄</div>
+                  </div>
+
+                  <div className={"bpr-skill-chip "+teach.className}>
+                    <span>{teach.icon}</span><b>{booking.teach_skill_name}</b>
+                  </div>
+
+                  <div className="bpr-swap-arc"></div>
+                </div>
+
+                <div className="bpr-person bpr-person-right">
+                  <div className="bpr-avatar-shell">
+                    {partner.avatar_url
+                      ? <img src={partner.avatar_url} className="bpr-avatar" alt="" />
+                      : <div className="bpr-avatar bpr-avatar-fallback">{partnerInitials}</div>}
+                    <span className="presence-dot"></span>
+                  </div>
+                  <div className="bpr-person-copy">
+                    <h4>{partnerName}</h4>
+                    <p>SkillSwap partner</p>
+                    <div className="bpr-person-stats">
+                      <span>⭐ {Number(partner.average_rating||0).toFixed(1)}</span>
+                      <span>↻ {partner.completed_swaps||0} swaps</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bpr-session-strip">
+                <div className="bpr-session-item">
+                  <span>📅</span>
+                  <div><small>Date & time</small><b>{formatDate(booking.starts_at)}</b></div>
+                </div>
+                <div className="bpr-divider"></div>
+                <div className="bpr-session-item">
+                  <span>⏱</span>
+                  <div><small>Duration</small><b>{booking.duration_minutes} min</b></div>
+                </div>
+                <div className="bpr-divider"></div>
+                <div className="bpr-session-item">
+                  <span>{booking.mode==="online"?"💻":"📍"}</span>
+                  <div><small>Session</small><b>{booking.mode==="online"?"Online":"In person"}</b></div>
+                </div>
+                <div className="bpr-divider"></div>
+                <div className="bpr-session-item">
+                  <span>📌</span>
+                  <div><small>Location</small><b>{booking.mode==="online"?(booking.meeting_link?"Meeting link ready":"Online"):(booking.location_note||"To be confirmed")}</b></div>
+                </div>
+              </div>
+
+              <div className="bpr-bottom">
+                <div className="bpr-note">
+                  <span>“</span>
+                  <p>{booking.note||"No preparation notes for this session."}</p>
+                </div>
+
+                <div className="bpr-actions">
+                  {booking.mode==="online" && booking.meeting_link &&
+                    <a className="outline booking-link" href={booking.meeting_link} target="_blank" rel="noreferrer">Open meeting ↗</a>}
                   <button className="danger-soft" onClick={()=>onAction(booking.id,"cancel")}>Cancel</button>
-                  <button className="primary" onClick={()=>onAction(booking.id,"complete")}>Complete session ✓</button>
+                  <button className="primary bpr-complete" onClick={()=>onAction(booking.id,"complete")}>Complete session ✓</button>
                 </div>
               </div>
             </article>
