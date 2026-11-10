@@ -34,13 +34,44 @@ export default function App(){
  const learnSkills=useMemo(()=>mySkills.filter(s=>s.kind==="learn"),[mySkills]);
 
  useEffect(()=>{ loadCatalog(); },[]);
- useEffect(()=>{ if(token){ loadMe(token); loadMySkills(token); } },[token]);
+ useEffect(()=>{ if(token){ loadMe(); loadMySkills(); } },[token]);
+
+ async function refreshAccessToken(){
+  const refresh=localStorage.getItem("skillswap_refresh");
+  if(!refresh) return "";
+  try{
+   const res=await fetch(API+"/auth/token/refresh/",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({refresh})
+   });
+   if(!res.ok) return "";
+   const data=await res.json();
+   localStorage.setItem("skillswap_access",data.access);
+   if(data.refresh) localStorage.setItem("skillswap_refresh",data.refresh);
+   setToken(data.access);
+   return data.access;
+  }catch{
+   return "";
+  }
+ }
 
  async function api(path, options={}){
-  const headers={...(options.headers||{})};
-  if(token) headers.Authorization="Bearer "+token;
-  if(options.body) headers["Content-Type"]="application/json";
-  return fetch(API+path,{...options,headers});
+  const makeRequest=(access)=>{
+   const headers={...(options.headers||{})};
+   if(access) headers.Authorization="Bearer "+access;
+   if(options.body) headers["Content-Type"]="application/json";
+   return fetch(API+path,{...options,headers});
+  };
+
+  const access=token||localStorage.getItem("skillswap_access")||"";
+  let res=await makeRequest(access);
+
+  if(res.status===401 && localStorage.getItem("skillswap_refresh")){
+   const newAccess=await refreshAccessToken();
+   if(newAccess) res=await makeRequest(newAccess);
+  }
+  return res;
  }
 
  async function loadCatalog(){
@@ -50,9 +81,9 @@ export default function App(){
   }catch{}
  }
 
- async function loadMe(access){
+ async function loadMe(){
   try{
-   const res=await fetch(API+"/auth/me/",{headers:{Authorization:"Bearer "+access}});
+   const res=await api("/auth/me/");
    if(!res.ok) throw new Error();
    const data=await res.json();
    setUser(data);
@@ -68,10 +99,10 @@ export default function App(){
   }
  }
 
- async function loadMySkills(access=token){
-  if(!access) return;
+ async function loadMySkills(){
+  if(!token && !localStorage.getItem("skillswap_access")) return;
   try{
-   const res=await fetch(API+"/skills/mine/",{headers:{Authorization:"Bearer "+access}});
+   const res=await api("/skills/mine/");
    if(res.ok) setMySkills(await res.json());
   }catch{}
  }
@@ -84,8 +115,14 @@ export default function App(){
    const payload=authMode==="register"?form:{username:form.username,password:form.password};
    const res=await fetch(API+endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
    const data=await res.json();
-   if(!res.ok) throw new Error(data.detail||Object.values(data).flat().join(" ")||"Unable to continue.");
+   if(!res.ok){
+    const details=Object.entries(data)
+     .map(([field,value])=>field+": "+(Array.isArray(value)?value.join(" "):value))
+     .join(" · ");
+    throw new Error(data.detail||details||"Unable to continue.");
+   }
    localStorage.setItem("skillswap_access",data.access);
+   if(data.refresh) localStorage.setItem("skillswap_refresh",data.refresh);
    setToken(data.access);
    setAuthOpen(false);
    if(data.user) setUser(data.user);
@@ -96,6 +133,7 @@ export default function App(){
 
  function logout(){
   localStorage.removeItem("skillswap_access");
+  localStorage.removeItem("skillswap_refresh");
   setToken(""); setUser(null); setMySkills([]); setMatches(previewMatches);
  }
 
