@@ -3,6 +3,7 @@ import RequestsPanel from "./RequestsPanel";
 import BookingsPanel from "./BookingsPanel";
 import ScheduleSwapModal from "./ScheduleSwapModal";
 import ChatPanel from "./ChatPanel";
+import WorkspacePanel from "./WorkspacePanel";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -52,6 +53,12 @@ export default function App(){
  const [chatMessages,setChatMessages]=useState([]);
  const [chatDraft,setChatDraft]=useState("");
  const [chatSending,setChatSending]=useState(false);
+ const [workspaceOpen,setWorkspaceOpen]=useState(false);
+ const [workspace,setWorkspace]=useState(null);
+ const [workspaceForm,setWorkspaceForm]=useState({goals:"",lesson_plan:"",shared_notes:"",progress_percentage:0});
+ const [workspaceResourceForm,setWorkspaceResourceForm]=useState({title:"",url:"",kind:"link"});
+ const [workspaceChecklistText,setWorkspaceChecklistText]=useState("");
+ const [workspaceSaving,setWorkspaceSaving]=useState(false);
 
  const teachSkills=useMemo(()=>mySkills.filter(s=>s.kind==="teach"),[mySkills]);
  const learnSkills=useMemo(()=>mySkills.filter(s=>s.kind==="learn"),[mySkills]);
@@ -187,6 +194,95 @@ export default function App(){
   }catch{}
  }
 
+ async function openWorkspace(bookingId){
+  try{
+   const res=await api("/workspaces/bookings/"+bookingId+"/");
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not open workspace.");
+    return;
+   }
+   setWorkspace(data);
+   setWorkspaceForm({
+    goals:data.goals||"",
+    lesson_plan:data.lesson_plan||"",
+    shared_notes:data.shared_notes||"",
+    progress_percentage:data.progress_percentage||0
+   });
+   setWorkspaceResourceForm({title:"",url:"",kind:"link"});
+   setWorkspaceChecklistText("");
+   setWorkspaceOpen(true);
+  }catch{
+   setNotice("Could not open workspace.");
+  }
+ }
+
+ async function refreshWorkspace(){
+  if(!workspace?.booking) return;
+  const res=await api("/workspaces/bookings/"+workspace.booking+"/");
+  if(res.ok) setWorkspace(await res.json());
+ }
+
+ async function saveWorkspace(){
+  if(!workspace?.booking) return;
+  setWorkspaceSaving(true);
+  try{
+   const res=await api("/workspaces/bookings/"+workspace.booking+"/",{
+    method:"PATCH",body:JSON.stringify(workspaceForm)
+   });
+   const data=await res.json();
+   if(!res.ok){ setNotice(data.detail||"Could not save workspace."); return; }
+   setWorkspace(data);
+   setWorkspaceForm({
+    goals:data.goals||"",lesson_plan:data.lesson_plan||"",
+    shared_notes:data.shared_notes||"",progress_percentage:data.progress_percentage||0
+   });
+   setNotice("Workspace saved.");
+  }finally{ setWorkspaceSaving(false); }
+ }
+
+ async function addWorkspaceResource(){
+  if(!workspace?.booking || !workspaceResourceForm.title.trim() || !workspaceResourceForm.url.trim()) return;
+  const res=await api("/workspaces/bookings/"+workspace.booking+"/resources/",{
+   method:"POST",body:JSON.stringify(workspaceResourceForm)
+  });
+  if(res.ok){
+   setWorkspaceResourceForm({title:"",url:"",kind:"link"});
+   await refreshWorkspace();
+  }else{
+   const data=await res.json().catch(()=>({}));
+   setNotice(data.detail||Object.values(data).flat().join(" ")||"Could not add resource.");
+  }
+ }
+
+ async function deleteWorkspaceResource(id){
+  const res=await api("/workspaces/resources/"+id+"/",{method:"DELETE"});
+  if(res.ok) await refreshWorkspace();
+ }
+
+ async function addWorkspaceChecklist(){
+  if(!workspace?.booking || !workspaceChecklistText.trim()) return;
+  const res=await api("/workspaces/bookings/"+workspace.booking+"/checklist/",{
+   method:"POST",body:JSON.stringify({text:workspaceChecklistText.trim()})
+  });
+  if(res.ok){
+   setWorkspaceChecklistText("");
+   await refreshWorkspace();
+  }
+ }
+
+ async function toggleWorkspaceChecklist(item){
+  const res=await api("/workspaces/checklist/"+item.id+"/",{
+   method:"PATCH",body:JSON.stringify({is_done:!item.is_done})
+  });
+  if(res.ok) await refreshWorkspace();
+ }
+
+ async function deleteWorkspaceChecklist(id){
+  const res=await api("/workspaces/checklist/"+id+"/",{method:"DELETE"});
+  if(res.ok) await refreshWorkspace();
+ }
+
  async function sendChatMessage(){
   if(!activeConversation?.swap || !chatDraft.trim()) return;
   setChatSending(true);
@@ -312,7 +408,7 @@ export default function App(){
  function logout(){
   localStorage.removeItem("skillswap_access");
   localStorage.removeItem("skillswap_refresh");
-  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]); setChatOpen(false); setActiveConversation(null); setChatMessages([]); setMatches(previewMatches);
+  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]); setChatOpen(false); setActiveConversation(null); setChatMessages([]); setWorkspaceOpen(false); setWorkspace(null); setMatches(previewMatches);
  }
 
  async function saveProfile(e){
@@ -603,7 +699,7 @@ export default function App(){
 
   {user && <RequestsPanel swaps={swaps} bookings={bookings} currentUserId={user.id} currentUser={user} onAction={handleSwapAction} onSchedule={openSchedule} onMessage={openChat} />}
 
-  {user && <BookingsPanel bookings={bookings} currentUser={user} onAction={handleBookingAction} onMessage={openChat} />}
+  {user && <BookingsPanel bookings={bookings} currentUser={user} onAction={handleBookingAction} onMessage={openChat} onWorkspace={openWorkspace} />}
 
   <section id="how" className="how glass">
    <div className="eyebrow">THREE SIMPLE MOVES</div><h2>Your knowledge is your currency.</h2>
@@ -678,6 +774,25 @@ export default function App(){
     onClose={()=>{setScheduleOpen(false);setSelectedSwap(null)}}
     onSubmit={submitBooking}
   />}
+
+  <WorkspacePanel
+    open={workspaceOpen}
+    workspace={workspace}
+    form={workspaceForm}
+    setForm={setWorkspaceForm}
+    resourceForm={workspaceResourceForm}
+    setResourceForm={setWorkspaceResourceForm}
+    checklistText={workspaceChecklistText}
+    setChecklistText={setWorkspaceChecklistText}
+    onClose={()=>setWorkspaceOpen(false)}
+    onSave={saveWorkspace}
+    onAddResource={addWorkspaceResource}
+    onDeleteResource={deleteWorkspaceResource}
+    onAddChecklist={addWorkspaceChecklist}
+    onToggleChecklist={toggleWorkspaceChecklist}
+    onDeleteChecklist={deleteWorkspaceChecklist}
+    saving={workspaceSaving}
+  />
 
   <ChatPanel
     open={chatOpen}
