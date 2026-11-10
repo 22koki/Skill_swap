@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import RequestsPanel from "./RequestsPanel";
 import BookingsPanel from "./BookingsPanel";
 import ScheduleSwapModal from "./ScheduleSwapModal";
+import ChatPanel from "./ChatPanel";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -45,6 +46,12 @@ export default function App(){
   location_note:"",
   note:""
  });
+ const [conversations,setConversations]=useState([]);
+ const [chatOpen,setChatOpen]=useState(false);
+ const [activeConversation,setActiveConversation]=useState(null);
+ const [chatMessages,setChatMessages]=useState([]);
+ const [chatDraft,setChatDraft]=useState("");
+ const [chatSending,setChatSending]=useState(false);
 
  const teachSkills=useMemo(()=>mySkills.filter(s=>s.kind==="teach"),[mySkills]);
  const learnSkills=useMemo(()=>mySkills.filter(s=>s.kind==="learn"),[mySkills]);
@@ -52,7 +59,7 @@ export default function App(){
  const learnVisual=getSkillVisual(learn);
 
  useEffect(()=>{ loadCatalog(); },[]);
- useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); } },[token]);
+ useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); } },[token]);
 
  async function refreshAccessToken(){
   const refresh=localStorage.getItem("skillswap_refresh");
@@ -139,6 +146,68 @@ export default function App(){
    const res=await api("/bookings/");
    if(res.ok) setBookings(await res.json());
   }catch{}
+ }
+
+ async function loadConversations(){
+  if(!token && !localStorage.getItem("skillswap_access")) return;
+  try{
+   const res=await api("/messages/conversations/");
+   if(res.ok) setConversations(await res.json());
+  }catch{}
+ }
+
+ async function openChat(swapId){
+  try{
+   const res=await api("/messages/swaps/"+swapId+"/");
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Chat is not available for this swap yet.");
+    return;
+   }
+   setActiveConversation(data.conversation);
+   setChatMessages(data.messages||[]);
+   setChatDraft("");
+   setChatOpen(true);
+   loadConversations();
+  }catch{
+   setNotice("Could not open chat.");
+  }
+ }
+
+ async function refreshActiveChat(){
+  if(!activeConversation?.swap) return;
+  try{
+   const res=await api("/messages/swaps/"+activeConversation.swap+"/");
+   if(res.ok){
+    const data=await res.json();
+    setActiveConversation(data.conversation);
+    setChatMessages(data.messages||[]);
+    loadConversations();
+   }
+  }catch{}
+ }
+
+ async function sendChatMessage(){
+  if(!activeConversation?.swap || !chatDraft.trim()) return;
+  setChatSending(true);
+  try{
+   const res=await api("/messages/swaps/"+activeConversation.swap+"/",{
+    method:"POST",
+    body:JSON.stringify({body:chatDraft.trim()})
+   });
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not send message.");
+    return;
+   }
+   setChatMessages(prev=>[...prev,data]);
+   setChatDraft("");
+   loadConversations();
+  }catch{
+   setNotice("Could not send message.");
+  }finally{
+   setChatSending(false);
+  }
  }
 
  function openSchedule(swap){
@@ -243,7 +312,7 @@ export default function App(){
  function logout(){
   localStorage.removeItem("skillswap_access");
   localStorage.removeItem("skillswap_refresh");
-  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setMatches(previewMatches);
+  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]); setChatOpen(false); setActiveConversation(null); setChatMessages([]); setMatches(previewMatches);
  }
 
  async function saveProfile(e){
@@ -370,6 +439,15 @@ export default function App(){
     <a href="#discover">Discover</a>
     {user && <a className="request-nav-link" href="#requests">Requests{swaps.filter(s=>s.recipient===user.id&&s.status==="proposed").length>0&&<span>{swaps.filter(s=>s.recipient===user.id&&s.status==="proposed").length}</span>}</a>}
     {user && <a href="#bookings">Bookings</a>}
+    {user && <button className="nav-message-button" onClick={()=>{
+      const first=conversations[0];
+      if(first) openChat(first.swap);
+      else setNotice("Your messages will appear after you accept a SkillSwap.");
+    }}>
+      Messages
+      {conversations.reduce((sum,c)=>sum+(c.unread_count||0),0)>0 &&
+        <span>{conversations.reduce((sum,c)=>sum+(c.unread_count||0),0)}</span>}
+    </button>}
     <a href="#how">How it works</a>
     <a href="#community">Community</a>
    </div>
@@ -523,9 +601,9 @@ export default function App(){
    <div className="empty-state glass"><div>🧭</div><h3>No matches yet</h3><p>Add more teach/learn skills to improve your chances.</p><button className="primary" onClick={()=>setSkillsOpen(true)}>Add skills</button></div>}
   </section>
 
-  {user && <RequestsPanel swaps={swaps} bookings={bookings} currentUserId={user.id} currentUser={user} onAction={handleSwapAction} onSchedule={openSchedule} />}
+  {user && <RequestsPanel swaps={swaps} bookings={bookings} currentUserId={user.id} currentUser={user} onAction={handleSwapAction} onSchedule={openSchedule} onMessage={openChat} />}
 
-  {user && <BookingsPanel bookings={bookings} currentUser={user} onAction={handleBookingAction} />}
+  {user && <BookingsPanel bookings={bookings} currentUser={user} onAction={handleBookingAction} onMessage={openChat} />}
 
   <section id="how" className="how glass">
    <div className="eyebrow">THREE SIMPLE MOVES</div><h2>Your knowledge is your currency.</h2>
@@ -600,6 +678,20 @@ export default function App(){
     onClose={()=>{setScheduleOpen(false);setSelectedSwap(null)}}
     onSubmit={submitBooking}
   />}
+
+  <ChatPanel
+    open={chatOpen}
+    conversation={activeConversation}
+    messages={chatMessages}
+    currentUserId={user?.id}
+    draft={chatDraft}
+    setDraft={setChatDraft}
+    onClose={()=>setChatOpen(false)}
+    onSend={sendChatMessage}
+    onRefresh={refreshActiveChat}
+    sending={chatSending}
+    booking={activeConversation ? bookings.find(b=>b.swap===activeConversation.swap && b.status==="scheduled") : null}
+  />
 
   {proposalOpen && selectedMatch && <div className="modal-backdrop" onMouseDown={()=>setProposalOpen(false)}>
    <div className="auth-modal glass" onMouseDown={e=>e.stopPropagation()}>
