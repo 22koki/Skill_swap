@@ -22,22 +22,22 @@ export default function BookingsPanel({ bookings, onAction }) {
 
       <div className="booking-grid">
         {upcoming.map(booking=>{
-          const learn=getSkillVisual(booking.requested_skill_name);
-          const teach=getSkillVisual(booking.offered_skill_name);
+          const learn=getSkillVisual(booking.learn_skill_name);
+          const teach=getSkillVisual(booking.teach_skill_name);
           return (
             <article className="booking-card glass" key={booking.id}>
               <div className="booking-card-top">
                 <div>
                   <div className="booking-kicker">WITH {booking.partner_name?.toUpperCase()}</div>
-                  <h3>{booking.requested_skill_name} ↔ {booking.offered_skill_name}</h3>
+                  <h3>{booking.learn_skill_name} ↔ {booking.teach_skill_name}</h3>
                 </div>
                 <span className="booking-status">Scheduled</span>
               </div>
 
               <div className="booking-skills">
-                <div className={learn.className}><span>{learn.icon}</span><small>Learn</small><b>{booking.requested_skill_name}</b></div>
+                <div className={learn.className}><span>{learn.icon}</span><small>Learn</small><b>{booking.learn_skill_name}</b></div>
                 <div className="booking-mini-swap">⇄</div>
-                <div className={teach.className}><span>{teach.icon}</span><small>Teach</small><b>{booking.offered_skill_name}</b></div>
+                <div className={teach.className}><span>{teach.icon}</span><small>Teach</small><b>{booking.teach_skill_name}</b></div>
               </div>
 
               <div className="booking-details">
