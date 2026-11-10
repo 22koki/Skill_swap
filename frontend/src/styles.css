@@ -53,3 +53,152 @@ html{scroll-behavior:smooth}.visual-button{border:0;cursor:pointer}.chip{border:
 .booking-details{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}.booking-details>div{border:1px solid #ebe5f5;background:rgba(255,255,255,.76);border-radius:16px;padding:13px;display:flex;gap:10px;align-items:center}.booking-details>div>span{font-size:22px}.booking-details p{margin:0;display:grid;gap:3px}.booking-details small{font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:#8a8294;font-weight:800}.booking-details b{font-size:12px}.booking-note{margin-top:14px;padding:13px 15px;border-radius:15px;background:#faf8ff;color:#6b6277;font-size:12px;font-style:italic}.booking-footer{display:flex;justify-content:space-between;gap:14px;align-items:center;margin-top:18px}.booking-actions{display:flex;gap:9px}.booking-link{text-decoration:none;display:inline-flex;align-items:center}.location-chip{font-size:12px;font-weight:700;color:#655c72;background:#f7f3ff;border-radius:999px;padding:10px 12px}
 .booking-jump{text-decoration:none;display:inline-flex}
 @media(max-width:760px){.schedule-hero{flex-direction:column}.schedule-pair{justify-content:flex-start}.schedule-grid,.schedule-summary{grid-template-columns:1fr}.booking-count{display:none}.booking-skills{grid-template-columns:1fr}.booking-mini-swap{justify-self:center;transform:rotate(90deg)}.booking-details{grid-template-columns:1fr}.booking-footer{flex-direction:column;align-items:stretch}.booking-actions{display:grid;grid-template-columns:1fr}.booking-actions button{width:100%}}
+
+/* Accepted Swap — Exchange Bridge visual */
+.accepted-bridge-card{
+  position:relative;
+  overflow:hidden;
+  border-radius:34px;
+  padding:0;
+  background:
+    radial-gradient(circle at 15% 20%,rgba(124,79,255,.10),transparent 28%),
+    radial-gradient(circle at 85% 20%,rgba(255,139,103,.12),transparent 28%),
+    linear-gradient(145deg,rgba(255,255,255,.96),rgba(248,244,255,.90));
+  border:1px solid rgba(119,79,216,.14);
+  box-shadow:0 30px 90px rgba(66,39,122,.13)
+}
+.bridge-bg-orb{position:absolute;border-radius:50%;filter:blur(8px);pointer-events:none}
+.bridge-bg-one{width:240px;height:240px;left:-90px;bottom:-100px;background:rgba(126,70,255,.10)}
+.bridge-bg-two{width:260px;height:260px;right:-100px;top:-110px;background:rgba(255,137,103,.10)}
+
+.accepted-bridge-head{
+  display:flex;justify-content:space-between;align-items:center;gap:20px;
+  padding:24px 28px 18px;position:relative;z-index:3
+}
+.bridge-avatar-shell .request-avatar{width:64px;height:64px;border-radius:22px}
+.accepted-meta{display:grid;justify-items:end;gap:7px}
+.accepted-meta small{font-size:10px;color:#948b9f}
+.accepted-badge{
+  padding:9px 13px;border-radius:999px;background:#e8f8ef;color:#148248;
+  font-size:10px;font-weight:900;box-shadow:0 8px 18px rgba(35,154,92,.08)
+}
+
+.exchange-bridge-scene{
+  display:grid;grid-template-columns:minmax(220px,1fr) minmax(280px,1.15fr) minmax(220px,1fr);
+  align-items:center;gap:0;padding:8px 28px 4px;position:relative;z-index:2
+}
+.bridge-side{
+  min-height:220px;border-radius:30px;padding:22px;position:relative;overflow:hidden;
+  display:grid;grid-template-rows:auto 1fr auto;
+  border:1px solid rgba(255,255,255,.85);
+  box-shadow:inset 0 1px rgba(255,255,255,.8),0 18px 38px rgba(70,42,120,.08)
+}
+.bridge-side-left{transform:perspective(900px) rotateY(4deg) rotate(-1deg)}
+.bridge-side-right{transform:perspective(900px) rotateY(-4deg) rotate(1deg)}
+.bridge-side::after{
+  content:"";position:absolute;width:160px;height:160px;border-radius:50%;
+  right:-60px;bottom:-70px;background:rgba(255,255,255,.28)
+}
+.bridge-side-label{
+  font-size:10px;letter-spacing:.13em;text-transform:uppercase;font-weight:900;color:#665d73
+}
+.bridge-skill-icon{
+  align-self:center;font-size:58px;filter:drop-shadow(0 12px 16px rgba(44,25,94,.15));position:relative;z-index:2
+}
+.bridge-side-copy{display:grid;gap:4px;position:relative;z-index:2}
+.bridge-side-copy small{font-size:11px;color:#766d82;font-weight:700}
+.bridge-side-copy strong{font:800 25px Manrope;letter-spacing:-.04em;color:#251b34}
+
+.bridge-center{
+  position:relative;min-height:260px;display:grid;place-items:center;align-content:center
+}
+.energy-bridge{
+  position:absolute;left:4%;right:4%;height:5px;border-radius:999px;
+  background:linear-gradient(90deg,rgba(124,73,255,.08),#8151ff 35%,#ff8d6d 68%,rgba(255,141,109,.08));
+  box-shadow:0 0 18px rgba(124,73,255,.24),0 0 26px rgba(255,141,109,.18);
+  overflow:hidden
+}
+.bridge-forward{top:36%;transform:rotate(-6deg)}
+.bridge-backward{bottom:34%;transform:rotate(6deg);background:linear-gradient(90deg,rgba(255,141,109,.08),#ff8d6d 35%,#8151ff 68%,rgba(124,73,255,.08))}
+.energy-dot{
+  position:absolute;top:50%;width:9px;height:9px;border-radius:50%;background:#fff;
+  box-shadow:0 0 16px #fff,0 0 22px #8b5cff;transform:translateY(-50%);
+  animation:bridgeFlow 3.6s linear infinite
+}
+.dot-a{animation-delay:0s}.dot-b{animation-delay:1.2s}.dot-c{animation-delay:2.4s}
+.bridge-backward .energy-dot{animation-name:bridgeFlowBack}
+@keyframes bridgeFlow{from{left:-4%}to{left:104%}}
+@keyframes bridgeFlowBack{from{left:104%}to{left:-4%}}
+
+.bridge-core{
+  width:138px;height:138px;border-radius:50%;display:grid;place-items:center;align-content:center;
+  background:radial-gradient(circle at 35% 30%,#9c75ff,#6c3fea 58%,#321a72 100%);
+  color:white;border:8px solid rgba(255,255,255,.94);
+  box-shadow:0 20px 55px rgba(102,60,224,.34),0 0 40px rgba(125,77,246,.18);
+  position:relative;z-index:6;text-align:center
+}
+.bridge-core-icon{font-size:34px;font-weight:900;line-height:1}
+.bridge-core>span{font-size:9px;font-weight:900;letter-spacing:.15em;margin-top:6px}
+.bridge-core>small{
+  margin-top:7px;padding:5px 8px;border-radius:999px;background:rgba(255,255,255,.14);
+  font-size:8px;max-width:112px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+.bridge-core-halo{position:absolute;border-radius:50%;border:1px dashed rgba(113,69,235,.28)}
+.halo-one{width:168px;height:168px}.halo-two{width:196px;height:196px;animation:swapSpin 16s linear infinite}
+
+.bridge-flight-chip{
+  position:absolute;z-index:7;padding:9px 12px;border-radius:999px;background:#fff;
+  border:1px solid rgba(113,76,190,.12);box-shadow:0 12px 26px rgba(55,33,104,.12);
+  font-size:10px;font-weight:900;display:flex;align-items:center;gap:6px
+}
+.chip-out{top:23%;left:7%;animation:chipFloatA 4.6s ease-in-out infinite}
+.chip-in{bottom:20%;right:7%;animation:chipFloatB 4.8s ease-in-out infinite}
+.bridge-flight-chip b{color:#7042ec}
+@keyframes chipFloatA{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes chipFloatB{0%,100%{transform:translateY(0)}50%{transform:translateY(7px)}}
+
+.bridge-message{
+  margin:18px 28px 0;padding:16px 18px;border-radius:20px;background:rgba(255,255,255,.80);
+  border:1px solid rgba(110,76,182,.10);display:flex;gap:12px;align-items:flex-start;position:relative;z-index:3
+}
+.bridge-message>span{font:800 40px Georgia;color:#8a61f0;opacity:.55;line-height:.8}
+.bridge-message p{margin:0;color:#655d72;font-size:13px;line-height:1.6;font-style:italic}
+
+.bridge-footer{
+  margin-top:20px;padding:20px 28px 24px;border-top:1px solid rgba(108,78,171,.09);
+  display:flex;justify-content:space-between;align-items:center;gap:18px;
+  background:linear-gradient(180deg,rgba(255,255,255,.28),rgba(255,255,255,.68));position:relative;z-index:3
+}
+.bridge-progress{position:relative;display:grid;grid-template-columns:auto 60px auto 60px auto;align-items:center;gap:7px}
+.bridge-progress>i{height:2px;background:linear-gradient(90deg,#7c4ff0,#6fd09a);border-radius:999px}
+.bridge-progress-dot{
+  width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:900;
+  border:2px solid #d8d0e9;background:white;color:#8a8294
+}
+.bridge-progress-dot.done{background:#eaf9f1;color:#18844b;border-color:#bce9d1}
+.bridge-progress-dot.active{background:#eee8ff;color:#6d3df5;border-color:#ccbdf5;box-shadow:0 0 0 5px rgba(109,61,245,.08)}
+.bridge-progress-labels{
+  position:absolute;left:-7px;right:-9px;top:36px;display:flex;justify-content:space-between
+}
+.bridge-progress-labels small{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#8e8599;font-weight:800}
+.bridge-actions{margin-left:auto}
+.bridge-schedule-button{background:linear-gradient(135deg,#7544f2,#ff895f);padding:13px 18px}
+
+@media(max-width:980px){
+  .exchange-bridge-scene{grid-template-columns:1fr;gap:14px}
+  .bridge-side-left,.bridge-side-right{transform:none}
+  .bridge-center{min-height:180px}
+  .energy-bridge{left:12%;right:12%}
+  .bridge-forward{top:40%}.bridge-backward{bottom:38%}
+  .chip-out{left:15%}.chip-in{right:15%}
+}
+@media(max-width:720px){
+  .accepted-bridge-head,.bridge-footer{flex-direction:column;align-items:flex-start}
+  .accepted-meta{justify-items:start}
+  .exchange-bridge-scene{padding-left:18px;padding-right:18px}
+  .bridge-message{margin-left:18px;margin-right:18px}
+  .bridge-footer{padding-left:18px;padding-right:18px}
+  .bridge-progress{margin-bottom:20px}
+  .bridge-actions{width:100%;margin-left:0}
+  .bridge-actions>*{width:100%;justify-content:center}
+}
