@@ -113,10 +113,7 @@ export default function SwapRequestCard({ swap, currentUserId, onAction }) {
             <button className="danger-soft" onClick={() => onAction(swap.id, "cancel")}>Cancel request</button>}
 
           {swap.status === "accepted" &&
-            <>
-              <button className="outline secondary-action">Message</button>
-              <button className="primary complete-button" onClick={() => onAction(swap.id, "complete")}>Mark complete ✓</button>
-            </>}
+            <button className="primary complete-button" onClick={() => onAction(swap.id, "complete")}>Mark complete ✓</button>}
         </div>
       </div>
     </article>
