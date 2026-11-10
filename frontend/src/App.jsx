@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import RequestsPanel from "./RequestsPanel";
+import BookingsPanel from "./BookingsPanel";
+import ScheduleSwapModal from "./ScheduleSwapModal";
 
 const API = "http://127.0.0.1:8000/api";
 const previewMatches = [
@@ -31,12 +33,23 @@ export default function App(){
  const [proposalForm,setProposalForm]=useState({offered_skill:"",requested_skill:"",message:""});
  const [notice,setNotice]=useState("");
  const [swaps,setSwaps]=useState([]);
+ const [bookings,setBookings]=useState([]);
+ const [scheduleOpen,setScheduleOpen]=useState(false);
+ const [selectedSwap,setSelectedSwap]=useState(null);
+ const [bookingForm,setBookingForm]=useState({
+  starts_at:"",
+  duration_minutes:"60",
+  mode:"online",
+  meeting_link:"",
+  location_note:"",
+  note:""
+ });
 
  const teachSkills=useMemo(()=>mySkills.filter(s=>s.kind==="teach"),[mySkills]);
  const learnSkills=useMemo(()=>mySkills.filter(s=>s.kind==="learn"),[mySkills]);
 
  useEffect(()=>{ loadCatalog(); },[]);
- useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); } },[token]);
+ useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); } },[token]);
 
  async function refreshAccessToken(){
   const refresh=localStorage.getItem("skillswap_refresh");
@@ -117,6 +130,76 @@ export default function App(){
   }catch{}
  }
 
+ async function loadBookings(){
+  if(!token && !localStorage.getItem("skillswap_access")) return;
+  try{
+   const res=await api("/bookings/");
+   if(res.ok) setBookings(await res.json());
+  }catch{}
+ }
+
+ function openSchedule(swap){
+  setSelectedSwap(swap);
+  setBookingForm({
+   starts_at:"",
+   duration_minutes:"60",
+   mode:"online",
+   meeting_link:"",
+   location_note:"",
+   note:""
+  });
+  setScheduleOpen(true);
+ }
+
+ async function submitBooking(e){
+  e.preventDefault();
+  if(!selectedSwap) return;
+  const startsAt=new Date(bookingForm.starts_at);
+  if(Number.isNaN(startsAt.getTime())){
+   setNotice("Choose a valid date and time.");
+   return;
+  }
+  const payload={
+   swap:selectedSwap.id,
+   starts_at:startsAt.toISOString(),
+   duration_minutes:Number(bookingForm.duration_minutes),
+   mode:bookingForm.mode,
+   meeting_link:bookingForm.mode==="online"?bookingForm.meeting_link:"",
+   location_note:bookingForm.mode==="in_person"?bookingForm.location_note:"",
+   note:bookingForm.note
+  };
+  const res=await api("/bookings/",{method:"POST",body:JSON.stringify(payload)});
+  if(res.ok){
+   const created=await res.json();
+   setBookings(prev=>[...prev.filter(b=>b.swap!==created.swap),created]);
+   setScheduleOpen(false);
+   setSelectedSwap(null);
+   setNotice("Session scheduled 📅");
+   setTimeout(()=>document.getElementById("bookings")?.scrollIntoView({behavior:"smooth"}),50);
+  }else{
+   const data=await res.json().catch(()=>({}));
+   const details=Object.values(data).flat().join(" ");
+   setNotice(details||"Could not schedule the session.");
+  }
+ }
+
+ async function handleBookingAction(id, action){
+  const res=await api("/bookings/"+id+"/"+action+"/",{method:"POST"});
+  if(res.ok){
+   const updated=await res.json();
+   setBookings(prev=>prev.map(b=>b.id===id?updated:b));
+   if(action==="complete"){
+    await loadSwaps();
+    setNotice("Session completed 🎉");
+   }else{
+    setNotice("Booking cancelled.");
+   }
+  }else{
+   const data=await res.json().catch(()=>({}));
+   setNotice(data.detail||"Could not update booking.");
+  }
+ }
+
  async function handleSwapAction(id, action){
   const res=await api("/swaps/"+id+"/"+action+"/",{method:"POST"});
   if(res.ok){
@@ -157,7 +240,7 @@ export default function App(){
  function logout(){
   localStorage.removeItem("skillswap_access");
   localStorage.removeItem("skillswap_refresh");
-  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setMatches(previewMatches);
+  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setMatches(previewMatches);
  }
 
  async function saveProfile(e){
@@ -265,6 +348,7 @@ export default function App(){
    <div className="links">
     <a href="#discover">Discover</a>
     {user && <a className="request-nav-link" href="#requests">Requests{swaps.filter(s=>s.recipient===user.id&&s.status==="proposed").length>0&&<span>{swaps.filter(s=>s.recipient===user.id&&s.status==="proposed").length}</span>}</a>}
+    {user && <a href="#bookings">Bookings</a>}
     <a href="#how">How it works</a>
     <a href="#community">Community</a>
    </div>
@@ -341,7 +425,9 @@ export default function App(){
    <div className="empty-state glass"><div>🧭</div><h3>No matches yet</h3><p>Add more teach/learn skills to improve your chances.</p><button className="primary" onClick={()=>setSkillsOpen(true)}>Add skills</button></div>}
   </section>
 
-  {user && <RequestsPanel swaps={swaps} currentUserId={user.id} onAction={handleSwapAction} />}
+  {user && <RequestsPanel swaps={swaps} bookings={bookings} currentUserId={user.id} onAction={handleSwapAction} onSchedule={openSchedule} />}
+
+  {user && <BookingsPanel bookings={bookings} onAction={handleBookingAction} />}
 
   <section id="how" className="how glass">
    <div className="eyebrow">THREE SIMPLE MOVES</div><h2>Your knowledge is your currency.</h2>
@@ -408,6 +494,14 @@ export default function App(){
     </div>
    </div>
   </div>}
+
+  {scheduleOpen && selectedSwap && <ScheduleSwapModal
+    swap={selectedSwap}
+    form={bookingForm}
+    setForm={setBookingForm}
+    onClose={()=>{setScheduleOpen(false);setSelectedSwap(null)}}
+    onSubmit={submitBooking}
+  />}
 
   {proposalOpen && selectedMatch && <div className="modal-backdrop" onMouseDown={()=>setProposalOpen(false)}>
    <div className="auth-modal glass" onMouseDown={e=>e.stopPropagation()}>
