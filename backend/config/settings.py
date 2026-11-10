@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     "swaps",
     "bookings",
     "messaging",
+    "workspaces",
 ]
 
 MIDDLEWARE = [
