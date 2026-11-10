@@ -10,7 +10,7 @@ function relativeTime(value) {
   return days === 1 ? "Yesterday" : days + " days ago";
 }
 
-export default function SwapRequestCard({ swap, currentUserId, onAction }) {
+export default function SwapRequestCard({ swap, currentUserId, onAction, onSchedule, booking }) {
   const incoming = swap.recipient === currentUserId;
   const personName = incoming ? swap.requester_name : swap.recipient_name;
   const personProfile = incoming ? swap.requester_profile : swap.recipient_profile;
@@ -99,7 +99,7 @@ export default function SwapRequestCard({ swap, currentUserId, onAction }) {
 
       <div className="request-footer premium-footer">
         <div className="footer-meta">
-          <span className="live-chip">{swap.status === "accepted" ? "Ready to schedule" : "Skill exchange"}</span>
+          <span className="live-chip">{swap.status === "accepted" ? (booking ? "Session scheduled" : "Ready to schedule") : "Skill exchange"}</span>
           <span>{incoming ? "You are the recipient" : "You sent this request"}</span>
         </div>
 
@@ -112,8 +112,10 @@ export default function SwapRequestCard({ swap, currentUserId, onAction }) {
           {swap.status === "proposed" && !incoming &&
             <button className="danger-soft" onClick={() => onAction(swap.id, "cancel")}>Cancel request</button>}
 
-          {swap.status === "accepted" &&
-            <button className="primary complete-button" onClick={() => onAction(swap.id, "complete")}>Mark complete ✓</button>}
+          {swap.status === "accepted" && !booking &&
+            <button className="primary complete-button" onClick={() => onSchedule(swap)}>Schedule session →</button>}
+          {swap.status === "accepted" && booking &&
+            <a className="outline booking-jump" href="#bookings">View booking ↓</a>}
         </div>
       </div>
     </article>
