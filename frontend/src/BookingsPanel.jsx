@@ -7,7 +7,7 @@ function formatDate(value){
   }).format(new Date(value));
 }
 
-export default function BookingsPanel({ bookings, currentUser, onAction }) {
+export default function BookingsPanel({ bookings, currentUser, onAction, onMessage }) {
   const upcoming=bookings.filter(b=>b.status==="scheduled");
   if(!upcoming.length) return null;
 
@@ -129,6 +129,7 @@ export default function BookingsPanel({ bookings, currentUser, onAction }) {
                 </div>
 
                 <div className="bpr-actions">
+                  <button className="outline bpr-message" onClick={()=>onMessage(booking.swap)}>💬 Message partner</button>
                   {booking.mode==="online" && booking.meeting_link &&
                     <a className="outline booking-link" href={booking.meeting_link} target="_blank" rel="noreferrer">Open meeting ↗</a>}
                   <button className="danger-soft" onClick={()=>onAction(booking.id,"cancel")}>Cancel</button>
