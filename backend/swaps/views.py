@@ -1,4 +1,5 @@
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -21,7 +22,7 @@ class SwapActionView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk, action):
-        swap = generics.get_object_or_404(Swap, pk=pk)
+        swap = get_object_or_404(Swap, pk=pk)
 
         if action in {"accept", "decline"} and swap.recipient != request.user:
             return Response({"detail": "Only the recipient can do that."}, status=403)
