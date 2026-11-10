@@ -4,24 +4,39 @@ from .models import Booking
 
 class BookingSerializer(serializers.ModelSerializer):
     partner_name = serializers.SerializerMethodField()
-    offered_skill_name = serializers.CharField(source="swap.offered_skill.name", read_only=True)
-    requested_skill_name = serializers.CharField(source="swap.requested_skill.name", read_only=True)
+    learn_skill_name = serializers.SerializerMethodField()
+    teach_skill_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
         fields = [
-            "id", "swap", "partner_name", "offered_skill_name", "requested_skill_name",
+            "id", "swap", "partner_name", "learn_skill_name", "teach_skill_name",
             "starts_at", "duration_minutes", "mode", "meeting_link",
             "location_note", "note", "status", "created_at", "updated_at",
         ]
         read_only_fields = ["status", "created_at", "updated_at"]
 
-    def get_partner_name(self, obj):
+    def _partner(self, obj):
         request = self.context.get("request")
         if not request or not request.user.is_authenticated:
-            return ""
-        partner = obj.swap.recipient if obj.swap.requester == request.user else obj.swap.requester
-        return partner.get_full_name() or partner.username
+            return None
+        return obj.swap.recipient if obj.swap.requester == request.user else obj.swap.requester
+
+    def get_partner_name(self, obj):
+        partner = self._partner(obj)
+        return (partner.get_full_name() or partner.username) if partner else ""
+
+    def get_learn_skill_name(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return obj.swap.requested_skill.name
+        return obj.swap.requested_skill.name if obj.swap.requester == request.user else obj.swap.offered_skill.name
+
+    def get_teach_skill_name(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return obj.swap.offered_skill.name
+        return obj.swap.offered_skill.name if obj.swap.requester == request.user else obj.swap.requested_skill.name
 
     def validate(self, attrs):
         request = self.context["request"]
@@ -36,5 +51,8 @@ class BookingSerializer(serializers.ModelSerializer):
 
         if starts_at and starts_at <= timezone.now():
             raise serializers.ValidationError("Choose a future date and time.")
+
+        if not self.instance and Booking.objects.filter(swap=swap, status=Booking.Status.SCHEDULED).exists():
+            raise serializers.ValidationError("This swap already has an upcoming booking.")
 
         return attrs
