@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     "skills",
     "swaps",
     "bookings",
+    "messaging",
 ]
 
 MIDDLEWARE = [
