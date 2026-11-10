@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import RequestsPanel from "./RequestsPanel";
 import BookingsPanel from "./BookingsPanel";
 import ScheduleSwapModal from "./ScheduleSwapModal";
+import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
 const previewMatches = [
@@ -47,6 +48,8 @@ export default function App(){
 
  const teachSkills=useMemo(()=>mySkills.filter(s=>s.kind==="teach"),[mySkills]);
  const learnSkills=useMemo(()=>mySkills.filter(s=>s.kind==="learn"),[mySkills]);
+ const teachVisual=getSkillVisual(teach);
+ const learnVisual=getSkillVisual(learn);
 
  useEffect(()=>{ loadCatalog(); },[]);
  useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); } },[token]);
@@ -396,14 +399,89 @@ export default function App(){
     <div className="trust"><span>● Community-powered learning</span><span>★ Reputation based</span><span>✓ No payments</span></div>
    </div>
 
-   <div className="visual">
-    <div className="orb"></div>
-    <button className="person p1 glass visual-button" onClick={()=>{setTeach("Python");openSkills()}}><div className="portrait purple">👩🏾‍💻</div><b>I teach Python 🐍</b></button>
-    <button className="person p2 glass visual-button" onClick={()=>{setLearn("Photography");openSkills()}}><div className="portrait orange">📷</div><b>I teach Photography 📸</b></button>
-    <div className="badge">96%<small>MATCH</small></div>
-    <button className="chip c1" onClick={()=>setTeach("React")}>React ⚛</button>
-    <button className="chip c2" onClick={()=>setLearn("UI/UX Design")}>Design ✦</button>
-    <button className="chip c3" onClick={()=>setLearn("Guitar")}>Guitar ♫</button>
+   <div className="match-showcase-hero">
+    <div className="msh-ambient msh-ambient-left"></div>
+    <div className="msh-ambient msh-ambient-right"></div>
+    <div className="msh-orbit msh-orbit-1"></div>
+    <div className="msh-orbit msh-orbit-2"></div>
+    <div className="msh-orbit msh-orbit-3"></div>
+
+    <button className="msh-chip msh-chip-react" onClick={()=>setTeach("React")}><span>⚛️</span> React</button>
+    <button className="msh-chip msh-chip-guitar" onClick={()=>setLearn("Guitar")}><span>🎸</span> Guitar</button>
+    <button className="msh-chip msh-chip-design" onClick={()=>setLearn("UI/UX Design")}><span>✦</span> Design</button>
+    <button className="msh-chip msh-chip-django" onClick={()=>setTeach("Django")}><span>🌿</span> Django</button>
+
+    <div className="msh-profile-wrap msh-profile-left">
+      <article className="msh-profile-card msh-card-purple">
+        <div className="msh-photo-wrap">
+          <span className="msh-online"><i></i> Online</span>
+          <img
+            className="msh-photo"
+            src={user?.profile?.avatar_url || "https://i.pravatar.cc/600?img=47"}
+            alt=""
+          />
+        </div>
+        <div className="msh-profile-info">
+          <div className="msh-name-row">
+            <div>
+              <h3>{user ? ((user.first_name||user.username)+(user.last_name?" "+user.last_name:"")) : "Ava Chen"}</h3>
+              <p>Software Developer</p>
+            </div>
+            <span className="msh-verified">✓</span>
+          </div>
+          <div className="msh-stats">
+            <span>⭐ {user?.profile?.average_rating || "4.9"}</span>
+            <span>↻ {user?.profile?.completed_swaps || 24} swaps</span>
+          </div>
+          <button className={"msh-skill-card " + teachVisual.className} onClick={openSkills}>
+            <span>{teachVisual.icon}</span>
+            <div><small>Teaches</small><strong>{teach || "Python"}</strong></div>
+          </button>
+        </div>
+      </article>
+      <div className="msh-podium msh-podium-purple"></div>
+    </div>
+
+    <div className="msh-center">
+      <div className="msh-arc msh-arc-top"></div>
+      <div className="msh-arc msh-arc-bottom"></div>
+      <div className="msh-flying-skill msh-flying-top"><span>{teachVisual.icon}</span><b>{teach || "Python"}</b><em>→</em></div>
+      <div className="msh-flying-skill msh-flying-bottom"><em>←</em><span>{learnVisual.icon}</span><b>{learn || "Photography"}</b></div>
+
+      <div className="msh-match-core">
+        <div className="msh-core-glow"></div>
+        <strong>96%</strong>
+        <span>MATCH</span>
+        <small>{teach || "Python"} ↔ {learn || "Photography"}</small>
+      </div>
+    </div>
+
+    <div className="msh-profile-wrap msh-profile-right">
+      <article className="msh-profile-card msh-card-orange">
+        <div className="msh-photo-wrap">
+          <span className="msh-online"><i></i> Online</span>
+          <img className="msh-photo" src="https://i.pravatar.cc/600?img=32" alt="" />
+        </div>
+        <div className="msh-profile-info">
+          <div className="msh-name-row">
+            <div>
+              <h3>Maya Ortiz</h3>
+              <p>Creative Photographer</p>
+            </div>
+            <span className="msh-verified">✓</span>
+          </div>
+          <div className="msh-stats">
+            <span>⭐ 4.9</span>
+            <span>↻ 42 swaps</span>
+          </div>
+          <button className={"msh-skill-card " + learnVisual.className} onClick={openSkills}>
+            <span>{learnVisual.icon}</span>
+            <div><small>Teaches</small><strong>{learn || "Photography"}</strong></div>
+          </button>
+        </div>
+      </article>
+      <div className="msh-podium msh-podium-orange"></div>
+    </div>
    </div>
   </section>
 
