@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -34,6 +35,6 @@ class PublicProfileView(APIView):
 
     def get(self, request, user_id):
         from django.contrib.auth.models import User
-        user = generics.get_object_or_404(User, pk=user_id)
+        user = get_object_or_404(User, pk=user_id)
         Profile.objects.get_or_create(user=user)
         return Response(UserSerializer(user).data)
