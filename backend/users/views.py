@@ -113,3 +113,123 @@ class CommunityUsersView(APIView):
             )
         )
         return Response(results)
+
+
+class SkillPassportView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, user_id):
+        from django.contrib.auth.models import User
+        from django.db.models import Q, Sum
+        from bookings.models import Booking
+        from skills.models import UserSkill
+        from reviews.services import reputation_badges
+
+        user = get_object_or_404(User, pk=user_id)
+        profile, _ = Profile.objects.get_or_create(user=user)
+
+        skill_links = UserSkill.objects.filter(user=user).select_related("skill", "skill__category")
+        teach_skills = skill_links.filter(kind=UserSkill.Kind.TEACH)
+        learn_skills = skill_links.filter(kind=UserSkill.Kind.LEARN)
+
+        completed_bookings = Booking.objects.filter(
+            Q(swap__requester=user) | Q(swap__recipient=user),
+            status=Booking.Status.COMPLETED,
+        ).select_related(
+            "swap", "swap__requester", "swap__recipient",
+            "swap__offered_skill", "swap__requested_skill",
+        ).order_by("-starts_at")
+
+        total_minutes = completed_bookings.aggregate(total=Sum("duration_minutes"))["total"] or 0
+        partner_ids = set()
+        journeys = []
+
+        for booking in completed_bookings[:8]:
+            swap = booking.swap
+            if swap.requester_id == user.id:
+                partner = swap.recipient
+                taught = swap.offered_skill
+                learned = swap.requested_skill
+            else:
+                partner = swap.requester
+                taught = swap.requested_skill
+                learned = swap.offered_skill
+
+            partner_ids.add(partner.id)
+            journeys.append({
+                "booking_id": booking.id,
+                "partner_id": partner.id,
+                "partner_name": partner.get_full_name() or partner.username,
+                "taught_skill": taught.name,
+                "learned_skill": learned.name,
+                "duration_minutes": booking.duration_minutes,
+                "starts_at": booking.starts_at,
+            })
+
+        badges = reputation_badges(profile)
+        milestones = []
+        completed_count = profile.completed_swaps
+        if completed_count >= 1:
+            milestones.append({"icon":"🤝","label":"First exchange completed","value":"1st swap"})
+        if total_minutes >= 60:
+            milestones.append({"icon":"⏱","label":"Learning time unlocked","value":f"{round(total_minutes / 60, 1)} hrs"})
+        if len(partner_ids) >= 3:
+            milestones.append({"icon":"🌐","label":"Learning network growing","value":f"{len(partner_ids)} partners"})
+        if profile.review_count >= 1:
+            milestones.append({"icon":"⭐","label":"First reputation review","value":f"{profile.review_count} review" + ("s" if profile.review_count != 1 else "")})
+        if len(teach_skills) >= 3:
+            milestones.append({"icon":"🎓","label":"Multi-skill teacher","value":f"{len(teach_skills)} skills"})
+        if len(learn_skills) >= 3:
+            milestones.append({"icon":"🌱","label":"Curious learner","value":f"{len(learn_skills)} goals"})
+
+        return Response({
+            "passport_code": f"SS-{user.id:05d}",
+            "user_id": user.id,
+            "name": user.get_full_name() or user.username,
+            "username": user.username,
+            "member_since": user.date_joined,
+            "avatar_url": profile.avatar_url,
+            "bio": profile.bio,
+            "location": profile.location,
+            "session_preference": profile.session_preference,
+            "availability_note": profile.availability_note,
+            "stats": {
+                "completed_swaps": profile.completed_swaps,
+                "total_hours_exchanged": round(total_minutes / 60, 1),
+                "teaching_hours": round(total_minutes / 60, 1),
+                "learning_hours": round(total_minutes / 60, 1),
+                "unique_partners": len(partner_ids),
+                "review_count": profile.review_count,
+                "average_rating": float(profile.average_rating),
+                "would_swap_again_percent": profile.would_swap_again_percent,
+            },
+            "reputation": {
+                "teaching": float(profile.teaching_rating),
+                "communication": float(profile.communication_rating),
+                "reliability": float(profile.reliability_rating),
+                "friendliness": float(profile.friendliness_rating),
+            },
+            "teach_skills": [
+                {
+                    "id": item.skill_id,
+                    "name": item.skill.name,
+                    "level": item.level,
+                    "category": item.skill.category.name if item.skill.category else "",
+                    "category_icon": item.skill.category.icon if item.skill.category else "",
+                }
+                for item in teach_skills
+            ],
+            "learn_skills": [
+                {
+                    "id": item.skill_id,
+                    "name": item.skill.name,
+                    "level": item.level,
+                    "category": item.skill.category.name if item.skill.category else "",
+                    "category_icon": item.skill.category.icon if item.skill.category else "",
+                }
+                for item in learn_skills
+            ],
+            "badges": badges,
+            "milestones": milestones,
+            "recent_journeys": journeys,
+        })
