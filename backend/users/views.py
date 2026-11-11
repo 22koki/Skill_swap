@@ -1,11 +1,11 @@
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Profile, AvailabilitySlot
-from .serializers import RegisterSerializer, UserSerializer, AvailabilitySlotSerializer
+from .models import Profile, AvailabilitySlot, UserBlock, SafetyReport, AccountStanding
+from .serializers import RegisterSerializer, UserSerializer, AvailabilitySlotSerializer, UserBlockSerializer, SafetyReportSerializer, AccountStandingSerializer
 from .matching import build_match_data
 from .progression import build_progression
 
@@ -646,3 +646,199 @@ class UniversalSearchView(APIView):
                 "circles": len(circles),
             },
         })
+
+
+
+def _report_evidence(target_type, target_id, reported_user):
+    evidence = {}
+    if target_type == SafetyReport.TargetType.MESSAGE and target_id:
+        from messaging.models import Message
+        message = Message.objects.select_related("sender").filter(pk=target_id).first()
+        if message:
+            evidence = {
+                "message_id": message.id,
+                "sender_id": message.sender_id,
+                "sender_name": message.sender.get_full_name() or message.sender.username,
+                "body": message.body[:1000],
+                "created_at": message.created_at.isoformat(),
+            }
+    elif target_type == SafetyReport.TargetType.CIRCLE and target_id:
+        from circles.models import SkillCircle
+        circle = SkillCircle.objects.filter(pk=target_id).first()
+        if circle:
+            evidence = {
+                "circle_id": circle.id,
+                "title": circle.title,
+                "description": circle.description[:1000],
+            }
+    elif target_type == SafetyReport.TargetType.CIRCLE_MESSAGE and target_id:
+        from circles.models import CircleMessage
+        message = CircleMessage.objects.select_related("sender", "circle").filter(pk=target_id).first()
+        if message:
+            evidence = {
+                "message_id": message.id,
+                "circle_id": message.circle_id,
+                "circle_title": message.circle.title,
+                "sender_id": message.sender_id,
+                "sender_name": message.sender.get_full_name() or message.sender.username,
+                "body": message.body[:1000],
+                "created_at": message.created_at.isoformat(),
+            }
+    elif target_type == SafetyReport.TargetType.USER and reported_user:
+        profile = getattr(reported_user, "profile", None)
+        evidence = {
+            "user_id": reported_user.id,
+            "username": reported_user.username,
+            "name": reported_user.get_full_name() or reported_user.username,
+            "bio": (profile.bio if profile else "")[:1000],
+        }
+    return evidence
+
+
+class BlockedUsersView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        blocks = UserBlock.objects.filter(blocker=request.user).select_related("blocked", "blocked__profile")
+        return Response(UserBlockSerializer(blocks, many=True).data)
+
+
+class UserBlockView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, user_id):
+        from django.contrib.auth.models import User
+        from swaps.models import Swap
+
+        target = get_object_or_404(User, pk=user_id)
+        if target == request.user:
+            return Response({"detail": "You cannot block yourself."}, status=400)
+
+        block, created = UserBlock.objects.get_or_create(blocker=request.user, blocked=target)
+
+        # Stop pending proposals between these users. Accepted/completed swaps remain as history.
+        Swap.objects.filter(
+            Q(requester=request.user, recipient=target) | Q(requester=target, recipient=request.user),
+            status=Swap.Status.PROPOSED,
+        ).update(status=Swap.Status.CANCELLED)
+
+        return Response({
+            "blocked": True,
+            "created": created,
+            "block": UserBlockSerializer(block).data,
+        })
+
+    def delete(self, request, user_id):
+        UserBlock.objects.filter(blocker=request.user, blocked_id=user_id).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SafetyReportCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from django.contrib.auth.models import User
+
+        target_type = str(request.data.get("target_type", "")).strip()
+        reason = str(request.data.get("reason", "")).strip()
+        target_id = request.data.get("target_id")
+        reported_user_id = request.data.get("reported_user")
+
+        valid_targets = {choice for choice, _ in SafetyReport.TargetType.choices}
+        valid_reasons = {choice for choice, _ in SafetyReport.Reason.choices}
+        if target_type not in valid_targets:
+            return Response({"detail": "Choose a valid report target."}, status=400)
+        if reason not in valid_reasons:
+            return Response({"detail": "Choose a valid report reason."}, status=400)
+
+        reported_user = None
+        if reported_user_id:
+            reported_user = get_object_or_404(User, pk=reported_user_id)
+        if reported_user == request.user:
+            return Response({"detail": "You cannot report yourself."}, status=400)
+
+        evidence = _report_evidence(target_type, target_id, reported_user)
+        report = SafetyReport.objects.create(
+            reporter=request.user,
+            reported_user=reported_user,
+            target_type=target_type,
+            target_id=target_id or None,
+            reason=reason,
+            details=str(request.data.get("details", "")).strip()[:3000],
+            evidence=evidence,
+        )
+        return Response(SafetyReportSerializer(report).data, status=201)
+
+
+class MySafetyView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        standing, _ = AccountStanding.objects.get_or_create(user=request.user)
+        reports = SafetyReport.objects.filter(reporter=request.user)[:20]
+        return Response({
+            "standing": AccountStandingSerializer(standing).data,
+            "reports": SafetyReportSerializer(reports, many=True).data,
+            "blocked": UserBlockSerializer(
+                UserBlock.objects.filter(blocker=request.user).select_related("blocked", "blocked__profile"),
+                many=True,
+            ).data,
+        })
+
+
+class ModerationQueueView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        reports = SafetyReport.objects.select_related(
+            "reporter", "reported_user", "reviewed_by"
+        ).all()
+        status_filter = request.query_params.get("status", "").strip()
+        if status_filter:
+            reports = reports.filter(status=status_filter)
+        return Response(SafetyReportSerializer(reports[:100], many=True).data)
+
+
+class ModerationReportActionView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request, pk, action):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        report = get_object_or_404(SafetyReport, pk=pk)
+        if action not in {"review", "dismiss", "resolve", "warn", "restrict", "suspend"}:
+            return Response({"detail": "Unknown moderation action."}, status=400)
+
+        report.reviewed_by = request.user
+        report.reviewed_at = timezone.now()
+        report.resolution_note = str(request.data.get("note", "")).strip()[:3000]
+
+        if action == "review":
+            report.status = SafetyReport.Status.REVIEWING
+        elif action == "dismiss":
+            report.status = SafetyReport.Status.DISMISSED
+            report.resolution_action = SafetyReport.ResolutionAction.NONE
+        else:
+            report.status = SafetyReport.Status.RESOLVED
+            if action == "resolve":
+                report.resolution_action = SafetyReport.ResolutionAction.NONE
+            elif report.reported_user:
+                standing, _ = AccountStanding.objects.get_or_create(user=report.reported_user)
+                if action == "warn":
+                    standing.warning_count += 1
+                    standing.note = report.resolution_note
+                    report.resolution_action = SafetyReport.ResolutionAction.WARN
+                elif action == "restrict":
+                    days = max(1, min(int(request.data.get("days", 7)), 30))
+                    standing.restricted_until = timezone.now() + timedelta(days=days)
+                    standing.note = report.resolution_note
+                    report.resolution_action = SafetyReport.ResolutionAction.RESTRICT
+                elif action == "suspend":
+                    standing.suspended = True
+                    standing.note = report.resolution_note
+                    report.resolution_action = SafetyReport.ResolutionAction.SUSPEND
+                standing.save()
+
+        report.save()
+        return Response(SafetyReportSerializer(report).data)
