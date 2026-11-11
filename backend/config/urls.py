@@ -20,4 +20,5 @@ urlpatterns = [
     path("api/workspaces/", include("workspaces.urls")),
     path("api/reviews/", include("reviews.urls")),
     path("api/notifications/", include("notifications.urls")),
+    path("api/circles/", include("circles.urls")),
 ]
