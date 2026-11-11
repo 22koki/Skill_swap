@@ -13,6 +13,7 @@ import AchievementUnlock from "./AchievementUnlock";
 import NotificationCenter from "./NotificationCenter";
 import SkillNetwork from "./SkillNetwork";
 import SkillCircles from "./SkillCircles";
+import UniversalSearch from "./UniversalSearch";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -103,6 +104,10 @@ export default function App(){
  const [circlesLoading,setCirclesLoading]=useState(false);
  const [activeCircle,setActiveCircle]=useState(null);
  const [circleMessages,setCircleMessages]=useState([]);
+ const [universalSearchOpen,setUniversalSearchOpen]=useState(false);
+ const [universalSearchQuery,setUniversalSearchQuery]=useState("");
+ const [universalSearchData,setUniversalSearchData]=useState({people:[],skills:[],circles:[],mentors:[],counts:{}});
+ const [universalSearchLoading,setUniversalSearchLoading]=useState(false);
  const [reviewForm,setReviewForm]=useState({
   overall_rating:5,
   teaching_quality:5,
@@ -125,6 +130,12 @@ export default function App(){
   const id=setInterval(()=>loadNotifications(false),20000);
   return ()=>clearInterval(id);
  },[token]);
+
+ useEffect(()=>{
+  if(!universalSearchOpen) return;
+  const id=setTimeout(()=>runUniversalSearch(universalSearchQuery),220);
+  return ()=>clearTimeout(id);
+ },[universalSearchQuery,universalSearchOpen]);
 
  async function refreshAccessToken(){
   const refresh=localStorage.getItem("skillswap_refresh");
@@ -194,6 +205,41 @@ export default function App(){
     if(!searched) setMatches(normalized);
    }
   }catch{}
+ }
+
+ async function runUniversalSearch(query=""){
+  setUniversalSearchLoading(true);
+  try{
+   const res=await api("/auth/search/?q="+encodeURIComponent(query));
+   if(res.ok) setUniversalSearchData(await res.json());
+  }finally{
+   setUniversalSearchLoading(false);
+  }
+ }
+
+ async function openUniversalSearch(){
+  setUniversalSearchOpen(true);
+  await runUniversalSearch("");
+ }
+
+ async function handleUniversalPerson(person){
+  setUniversalSearchOpen(false);
+  await openPassport(person.user_id);
+ }
+
+ async function handleUniversalSkill(skill){
+  setUniversalSearchOpen(false);
+  setTeach(skill.name);
+  setLearn(skill.name);
+  document.getElementById("discover")?.scrollIntoView({behavior:"smooth"});
+  setNotice("Showing SkillSwap around "+skill.name+".");
+ }
+
+ async function handleUniversalCircle(circle){
+  setUniversalSearchOpen(false);
+  setCirclesOpen(true);
+  await loadCircles();
+  await openCircle(circle.id);
  }
 
  async function loadCircles(){
@@ -996,6 +1042,7 @@ export default function App(){
   setNotificationOpen(false); setNotifications([]); setNotificationUnread(0);
   setNetworkOpen(false); setNetworkData(null);
   setCirclesOpen(false); setCircles([]); setActiveCircle(null); setCircleMessages([]);
+  setUniversalSearchOpen(false); setUniversalSearchQuery(""); setUniversalSearchData({people:[],skills:[],circles:[],mentors:[],counts:{}});
   setSearched(false); setMatches(communityUsers.map(person=>({...person,score:null,confidence:"",breakdown:{},reasons:[],missing:[],suggested_times:[]})));
  }
 
@@ -1174,6 +1221,9 @@ export default function App(){
    </div>
 
    <div className="actions nav-actions">
+    <button className="nav-search-button" onClick={openUniversalSearch} aria-label="Search SkillSwap">
+      <span>⌕</span><b>Search</b><kbd>⌘ K</kbd>
+    </button>
     {user ? <>
       <button className="notification-bell nav-icon-button" onClick={()=>{setNotificationOpen(true);loadNotifications();}} aria-label="Notifications">
        <span className="notification-bell-icon">🔔</span>
@@ -1499,6 +1549,20 @@ export default function App(){
     onClose={()=>{setScheduleOpen(false);setSelectedSwap(null)}}
     onSubmit={submitBooking}
   />}
+
+  <UniversalSearch
+    open={universalSearchOpen}
+    query={universalSearchQuery}
+    setQuery={setUniversalSearchQuery}
+    data={universalSearchData}
+    loading={universalSearchLoading}
+    onClose={()=>setUniversalSearchOpen(false)}
+    onPerson={handleUniversalPerson}
+    onSkill={handleUniversalSkill}
+    onCircle={handleUniversalCircle}
+    onPropose={match=>{setUniversalSearchOpen(false);openProposal(match);}}
+    currentUser={user}
+  />
 
   <SkillCircles
     open={circlesOpen}
