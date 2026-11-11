@@ -10,7 +10,7 @@ function formatJourneyDate(value){
   return new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric",year:"numeric"}).format(new Date(value));
 }
 
-export default function SkillPassport({open,passport,onClose}){
+export default function SkillPassport({open,passport,currentUserId,onBlock,onReport,onClose}){
   if(!open || !passport) return null;
 
   const initials=(passport.name||passport.username||"SS").split(" ").map(x=>x[0]).join("").slice(0,2).toUpperCase();
@@ -51,10 +51,22 @@ export default function SkillPassport({open,passport,onClose}){
               {passport.bio && <blockquote>{passport.bio}</blockquote>}
             </div>
 
-            <div className="passport-reputation-badge">
-              <strong>{Number(passport.stats.average_rating||0).toFixed(1)}</strong>
-              <span>★ reputation</span>
-              <small>{passport.stats.review_count} reviews</small>
+            <div className="passport-identity-actions">
+              <div className="passport-reputation-badge">
+                <strong>{Number(passport.stats.average_rating||0).toFixed(1)}</strong>
+                <span>★ reputation</span>
+                <small>{passport.stats.review_count} reviews</small>
+              </div>
+              {currentUserId&&currentUserId!==passport.user_id&&<div className="passport-safety-actions">
+                <button className="outline" onClick={()=>onReport?.({
+                  target_type:"user",
+                  reported_user:passport.user_id,
+                  target_id:passport.user_id,
+                  label:passport.name+" (@"+passport.username+")",
+                  icon:"⚠"
+                })}>⚠ Report</button>
+                <button className="danger-soft" onClick={()=>onBlock?.(passport.user_id)}>⛔ Block</button>
+              </div>}
             </div>
           </div>
 
