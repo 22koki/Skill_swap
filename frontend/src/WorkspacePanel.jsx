@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getSkillVisual } from "./skillVisuals";
 import AISessionPlanner from "./AISessionPlanner";
 import SessionRecap from "./SessionRecap";
@@ -41,6 +41,9 @@ export default function WorkspacePanel({
   recapAddingChecklist,
 }){
   const [tab,setTab]=useState("plan");
+  useEffect(()=>{
+    if(open && workspace) setTab(workspace.booking_status==="completed"?"recap":"plan");
+  },[open,workspace?.booking]);
   if(!open || !workspace) return null;
 
   const learn=getSkillVisual(workspace.learn_skill_name);
