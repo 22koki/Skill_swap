@@ -28,3 +28,22 @@ class Profile(models.Model):
 
     def __str__(self):
         return f"{self.user.username}'s profile"
+
+
+class AvailabilitySlot(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="availability_slots")
+    weekday = models.PositiveSmallIntegerField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+
+    class Meta:
+        ordering = ["weekday", "start_time"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "weekday", "start_time", "end_time"],
+                name="unique_user_availability_slot",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} · {self.weekday} · {self.start_time}-{self.end_time}"
