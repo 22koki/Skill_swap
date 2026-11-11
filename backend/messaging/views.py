@@ -1,3 +1,5 @@
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -6,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from swaps.models import Swap
-from .models import Conversation, Message
+from .models import Conversation, Message, UserPresence
 from .serializers import ConversationSerializer, MessageSerializer
 from notifications.models import Notification
 from notifications.services import notify
@@ -72,9 +74,16 @@ class SwapConversationView(APIView):
             return Response({"detail": "Message is too long."}, status=400)
 
         conversation, _ = Conversation.objects.get_or_create(swap=swap)
-        message = Message.objects.create(conversation=conversation, sender=request.user, body=body)
-        conversation.save(update_fields=["updated_at"])
         recipient = swap.recipient if swap.requester == request.user else swap.requester
+        recipient_presence = UserPresence.objects.filter(user=recipient).first()
+        delivered_at = timezone.now() if recipient_presence and recipient_presence.connection_count > 0 else None
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=request.user,
+            body=body,
+            delivered_at=delivered_at,
+        )
+        conversation.save(update_fields=["updated_at"])
         notify(
             recipient,
             Notification.Kind.MESSAGE,
@@ -85,4 +94,11 @@ class SwapConversationView(APIView):
             target_id=swap.id,
             dedupe_key=f"message:{message.id}",
         )
-        return Response(MessageSerializer(message).data, status=status.HTTP_201_CREATED)
+        payload = MessageSerializer(message).data
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{swap.id}",
+                {"type": "chat_message_event", "message": payload},
+            )
+        return Response(payload, status=status.HTTP_201_CREATED)
