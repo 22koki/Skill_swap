@@ -419,6 +419,12 @@ export default function App(){
   }
   if(item.action_type==="review"){
    if(user?.id) await openPassport(user.id);
+   return;
+  }
+  if(item.action_type==="circle" && item.target_id){
+   setCirclesOpen(true);
+   await loadCircles();
+   await openCircle(item.target_id);
   }
  }
 
