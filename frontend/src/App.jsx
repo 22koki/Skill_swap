@@ -18,6 +18,7 @@ import SkillCircles from "./SkillCircles";
 import UniversalSearch from "./UniversalSearch";
 import ReportModal from "./ReportModal";
 import SafetyCenter from "./SafetyCenter";
+import HomeDashboard from "./HomeDashboard";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -151,6 +152,8 @@ export default function App(){
  const [reportTarget,setReportTarget]=useState(null);
  const [reportSaving,setReportSaving]=useState(false);
  const [reportForm,setReportForm]=useState({reason:"harassment",details:""});
+ const [dashboardData,setDashboardData]=useState(null);
+ const [dashboardLoading,setDashboardLoading]=useState(false);
  const [reviewForm,setReviewForm]=useState({
   overall_rating:5,
   teaching_quality:5,
@@ -167,7 +170,7 @@ export default function App(){
  const learnVisual=getSkillVisual(learn);
 
  useEffect(()=>{ loadCatalog(); loadCommunityUsers(); },[]);
- useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); loadAvailability(); loadCommunityUsers(); loadProgression(false); loadNotifications(); loadNotificationPreferences(); } },[token]);
+ useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); loadAvailability(); loadCommunityUsers(); loadProgression(false); loadNotifications(); loadNotificationPreferences(); loadDashboard(); } },[token]);
  useEffect(()=>{
   if(!token) return;
   const id=setInterval(()=>loadNotifications(false),60000);
@@ -199,6 +202,7 @@ export default function App(){
      loadConversations();
      if(item.action_type==="booking") loadBookings();
      if(item.action_type==="swap") loadSwaps();
+     loadDashboard();
     }
     if(data.event==="presence"&&data.presence){
      const p=data.presence;
@@ -402,6 +406,17 @@ export default function App(){
   }catch{}
  }
 
+ async function loadDashboard(){
+  if(!token && !localStorage.getItem("skillswap_access")) return;
+  setDashboardLoading(true);
+  try{
+   const res=await api("/auth/dashboard/");
+   if(res.ok) setDashboardData(await res.json());
+  }catch{}finally{
+   setDashboardLoading(false);
+  }
+ }
+
  async function loadCommunityUsers(){
   try{
    const access=localStorage.getItem("skillswap_access")||"";
@@ -498,6 +513,7 @@ export default function App(){
    setNotice("User unblocked.");
    await loadSafetyCenter();
    await loadCommunityUsers();
+   await loadDashboard();
   }
  }
 
@@ -1330,7 +1346,9 @@ export default function App(){
   setRescheduleBooking(null);
   setNotice("Reschedule proposal sent ↻");
   await loadBookings();
+  await loadDashboard();
   if(calendarOpen) await openCalendar();
+  loadDashboard();
  }
 
  async function handleRescheduleAction(id,action){
@@ -1385,6 +1403,7 @@ export default function App(){
    setScheduleOpen(false);
    setSelectedSwap(null);
    setNotice("Session scheduled 📅");
+   loadDashboard();
    setTimeout(()=>document.getElementById("bookings")?.scrollIntoView({behavior:"smooth"}),50);
   }else{
    const data=await res.json().catch(()=>({}));
@@ -1447,9 +1466,11 @@ export default function App(){
     await loadMe();
     await loadProgression(true);
     setNotice("Session completed 🎉");
+    loadDashboard();
     openReview(updated);
    }else{
     setNotice("Booking cancelled.");
+    loadDashboard();
    }
   }else{
    const data=await res.json().catch(()=>({}));
@@ -1464,6 +1485,7 @@ export default function App(){
    setSwaps(prev=>prev.map(s=>s.id===id?updated:s));
    const copy={accept:"Swap accepted 🤝",decline:"Request declined.",cancel:"Request cancelled.",complete:"Swap completed 🎉"};
    setNotice(copy[action]||"Swap updated.");
+   loadDashboard();
   }else{
    const data=await res.json().catch(()=>({}));
    setNotice(data.detail||"Could not update the swap.");
@@ -1622,6 +1644,7 @@ export default function App(){
    setSwaps(prev=>[created,...prev]);
    setProposalOpen(false);
    setNotice("Swap proposal sent 🎉");
+   loadDashboard();
   }else{
    const data=await res.json().catch(()=>({}));
    setNotice(data.detail||data.non_field_errors?.[0]||"Could not send proposal.");
@@ -1755,7 +1778,23 @@ export default function App(){
    </div>
   </nav>
 
-  <section id="top" className="hero">
+  {user && <HomeDashboard
+    user={user}
+    data={dashboardData}
+    loading={dashboardLoading}
+    onRefresh={loadDashboard}
+    onCalendar={openCalendar}
+    onWorkspace={openWorkspace}
+    onChat={openChat}
+    onRequests={()=>document.getElementById("requests")?.scrollIntoView({behavior:"smooth"})}
+    onCircle={openCalendarCircle}
+    onProposal={openProposal}
+    onProgression={()=>setProgressionOpen(true)}
+    onDiscover={()=>findMatches(true)}
+    onPassport={openPassport}
+  />}
+
+  {!user && <section id="top" className="hero">
    <div className="copy">
     <div className="eyebrow">✦ LEARNING POWERED BY PEOPLE</div>
     <h1>Swap skills.<br/><span>Grow together.</span></h1>
@@ -1853,7 +1892,7 @@ export default function App(){
       <div className="msh-podium msh-podium-orange"></div>
     </div>
    </div>
-  </section>
+  </section>}
 
   {user && <section className="profile-strip glass">
     <div>
