@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import RequestsPanel from "./RequestsPanel";
 import BookingsPanel from "./BookingsPanel";
 import ScheduleSwapModal from "./ScheduleSwapModal";
+import RescheduleModal from "./RescheduleModal";
+import CalendarPanel from "./CalendarPanel";
 import ChatPanel from "./ChatPanel";
 import WorkspacePanel from "./WorkspacePanel";
 import ReviewModal from "./ReviewModal";
@@ -44,6 +46,24 @@ export default function App(){
  const [bookings,setBookings]=useState([]);
  const [scheduleOpen,setScheduleOpen]=useState(false);
  const [selectedSwap,setSelectedSwap]=useState(null);
+ const [scheduleSuggestions,setScheduleSuggestions]=useState([]);
+ const [scheduleSuggestionsLoading,setScheduleSuggestionsLoading]=useState(false);
+ const [scheduleAvailabilityComplete,setScheduleAvailabilityComplete]=useState(false);
+ const [scheduleError,setScheduleError]=useState("");
+ const [rescheduleOpen,setRescheduleOpen]=useState(false);
+ const [rescheduleBooking,setRescheduleBooking]=useState(null);
+ const [rescheduleSuggestions,setRescheduleSuggestions]=useState([]);
+ const [rescheduleSuggestionsLoading,setRescheduleSuggestionsLoading]=useState(false);
+ const [rescheduleForm,setRescheduleForm]=useState({
+  starts_at:"",
+  duration_minutes:"60",
+  mode:"online",
+  meeting_link:"",
+  location_note:"",
+  note:""
+ });
+ const [calendarOpen,setCalendarOpen]=useState(false);
+ const [calendarEvents,setCalendarEvents]=useState([]);
  const [bookingForm,setBookingForm]=useState({
   starts_at:"",
   duration_minutes:"60",
@@ -898,6 +918,104 @@ export default function App(){
   }
  }
 
+ async function loadScheduleSuggestions(swapId,duration=60,target="schedule"){
+  const setLoading=target==="reschedule"?setRescheduleSuggestionsLoading:setScheduleSuggestionsLoading;
+  const setItems=target==="reschedule"?setRescheduleSuggestions:setScheduleSuggestions;
+  setLoading(true);
+  try{
+   const res=await api("/bookings/swaps/"+swapId+"/suggestions/?duration="+Number(duration||60));
+   const data=await res.json();
+   if(res.ok){
+    setItems(data.suggestions||[]);
+    if(target==="schedule") setScheduleAvailabilityComplete(!!data.availability_complete);
+   }else{
+    setItems([]);
+   }
+  }catch{
+   setItems([]);
+  }finally{
+   setLoading(false);
+  }
+ }
+
+ async function openCalendar(){
+  setCalendarOpen(true);
+  const res=await api("/bookings/calendar/");
+  if(res.ok){
+   const data=await res.json();
+   setCalendarEvents(data.events||[]);
+  }
+ }
+
+ async function openCalendarBooking(bookingId){
+  setCalendarOpen(false);
+  await openWorkspace(bookingId);
+ }
+
+ async function openCalendarCircle(circleId){
+  setCalendarOpen(false);
+  setCirclesOpen(true);
+  await loadCircles();
+  await openCircle(circleId);
+ }
+
+ async function openReschedule(booking){
+  setRescheduleBooking(booking);
+  setRescheduleForm({
+   starts_at:"",
+   duration_minutes:String(booking.duration_minutes||60),
+   mode:booking.mode||"online",
+   meeting_link:booking.meeting_link||"",
+   location_note:booking.location_note||"",
+   note:""
+  });
+  setRescheduleSuggestions([]);
+  setRescheduleOpen(true);
+  await loadScheduleSuggestions(booking.swap,booking.duration_minutes||60,"reschedule");
+ }
+
+ async function submitReschedule(e){
+  e.preventDefault();
+  if(!rescheduleBooking) return;
+  const startsAt=new Date(rescheduleForm.starts_at);
+  if(Number.isNaN(startsAt.getTime())){
+   setNotice("Choose a valid new date and time.");
+   return;
+  }
+  const payload={
+   proposed_starts_at:startsAt.toISOString(),
+   proposed_duration_minutes:Number(rescheduleForm.duration_minutes),
+   proposed_mode:rescheduleForm.mode,
+   proposed_meeting_link:rescheduleForm.mode==="online"?rescheduleForm.meeting_link:"",
+   proposed_location_note:rescheduleForm.mode==="in_person"?rescheduleForm.location_note:"",
+   note:rescheduleForm.note
+  };
+  const res=await api("/bookings/"+rescheduleBooking.id+"/reschedule/",{method:"POST",body:JSON.stringify(payload)});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){
+   const conflict=data.schedule_check?.messages?.join(" ");
+   setNotice(conflict||data.detail||"Could not propose the new time.");
+   return;
+  }
+  setRescheduleOpen(false);
+  setRescheduleBooking(null);
+  setNotice("Reschedule proposal sent ↻");
+  await loadBookings();
+  if(calendarOpen) await openCalendar();
+ }
+
+ async function handleRescheduleAction(id,action){
+  const res=await api("/bookings/reschedules/"+id+"/"+action+"/",{method:"POST"});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){
+   setNotice(data.detail||"Could not update the reschedule proposal.");
+   return;
+  }
+  setBookings(prev=>prev.map(item=>item.id===data.id?data:item));
+  setNotice(action==="accept"?"New session time accepted 📅":action==="decline"?"Reschedule proposal declined.":"Reschedule proposal cancelled.");
+  if(calendarOpen) await openCalendar();
+ }
+
  function openSchedule(swap){
   setSelectedSwap(swap);
   setBookingForm({
@@ -908,7 +1026,10 @@ export default function App(){
    location_note:"",
    note:""
   });
+  setScheduleError("");
+  setScheduleSuggestions([]);
   setScheduleOpen(true);
+  loadScheduleSuggestions(swap.id,60,"schedule");
  }
 
  async function submitBooking(e){
@@ -938,8 +1059,10 @@ export default function App(){
    setTimeout(()=>document.getElementById("bookings")?.scrollIntoView({behavior:"smooth"}),50);
   }else{
    const data=await res.json().catch(()=>({}));
-   const details=Object.values(data).flat().join(" ");
-   setNotice(details||"Could not schedule the session.");
+   const conflict=(data.starts_at||[]).flat?.().join?.(" ") || data.schedule_check?.messages?.join(" ");
+   const details=conflict || data.non_field_errors?.join?.(" ") || data.detail || "Could not schedule the session.";
+   setScheduleError(details);
+   setNotice(details);
   }
  }
 
@@ -1053,6 +1176,9 @@ export default function App(){
   setNotificationOpen(false); setNotifications([]); setNotificationUnread(0);
   setNetworkOpen(false); setNetworkData(null);
   setCirclesOpen(false); setCircles([]); setActiveCircle(null); setCircleMessages([]);
+  setScheduleOpen(false); setSelectedSwap(null); setScheduleSuggestions([]); setScheduleError("");
+  setRescheduleOpen(false); setRescheduleBooking(null); setRescheduleSuggestions([]);
+  setCalendarOpen(false); setCalendarEvents([]);
   setUniversalSearchOpen(false); setUniversalSearchQuery(""); setUniversalSearchData({people:[],skills:[],circles:[],mentors:[],counts:{}});
   setSearched(false); setMatches(communityUsers.map(person=>({...person,score:null,confidence:"",breakdown:{},reasons:[],missing:[],suggested_times:[]})));
  }
@@ -1485,7 +1611,17 @@ export default function App(){
 
   {user && <RequestsPanel swaps={swaps} bookings={bookings} currentUserId={user.id} currentUser={user} onAction={handleSwapAction} onSchedule={openSchedule} onMessage={openChat} />}
 
-  {user && <BookingsPanel bookings={bookings} currentUser={user} onAction={handleBookingAction} onMessage={openChat} onWorkspace={openWorkspace} onReview={openReview} />}
+  {user && <BookingsPanel
+    bookings={bookings}
+    currentUser={user}
+    onAction={handleBookingAction}
+    onMessage={openChat}
+    onWorkspace={openWorkspace}
+    onReview={openReview}
+    onReschedule={openReschedule}
+    onRescheduleAction={handleRescheduleAction}
+    onCalendar={openCalendar}
+  />}
 
   <section id="how" className="how glass">
    <div className="eyebrow">THREE SIMPLE MOVES</div><h2>Your knowledge is your currency.</h2>
@@ -1557,9 +1693,33 @@ export default function App(){
     swap={selectedSwap}
     form={bookingForm}
     setForm={setBookingForm}
-    onClose={()=>{setScheduleOpen(false);setSelectedSwap(null)}}
+    suggestions={scheduleSuggestions}
+    suggestionsLoading={scheduleSuggestionsLoading}
+    availabilityComplete={scheduleAvailabilityComplete}
+    scheduleError={scheduleError}
+    onRefreshSuggestions={duration=>loadScheduleSuggestions(selectedSwap.id,duration,"schedule")}
+    onClose={()=>{setScheduleOpen(false);setSelectedSwap(null);setScheduleError("")}}
     onSubmit={submitBooking}
   />}
+
+  <RescheduleModal
+    booking={rescheduleOpen?rescheduleBooking:null}
+    form={rescheduleForm}
+    setForm={setRescheduleForm}
+    suggestions={rescheduleSuggestions}
+    loadingSuggestions={rescheduleSuggestionsLoading}
+    onRefreshSuggestions={duration=>rescheduleBooking&&loadScheduleSuggestions(rescheduleBooking.swap,duration,"reschedule")}
+    onClose={()=>{setRescheduleOpen(false);setRescheduleBooking(null)}}
+    onSubmit={submitReschedule}
+  />
+
+  <CalendarPanel
+    open={calendarOpen}
+    events={calendarEvents}
+    onClose={()=>setCalendarOpen(false)}
+    onOpenBooking={openCalendarBooking}
+    onOpenCircle={openCalendarCircle}
+  />
 
   <UniversalSearch
     open={universalSearchOpen}
