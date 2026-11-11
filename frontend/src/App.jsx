@@ -10,6 +10,7 @@ import AvailabilityModal from "./AvailabilityModal";
 import SmartMatchCard from "./SmartMatchCard";
 import ProgressionPanel from "./ProgressionPanel";
 import AchievementUnlock from "./AchievementUnlock";
+import NotificationCenter from "./NotificationCenter";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -72,6 +73,12 @@ export default function App(){
  const [progression,setProgression]=useState(null);
  const [progressionOpen,setProgressionOpen]=useState(false);
  const [achievementUnlock,setAchievementUnlock]=useState(null);
+ const [notificationOpen,setNotificationOpen]=useState(false);
+ const [notifications,setNotifications]=useState([]);
+ const [notificationUnread,setNotificationUnread]=useState(0);
+ const [notificationPreferences,setNotificationPreferences]=useState({
+  swaps:true,messages:true,sessions:true,reviews:true,progress:true,matches:true
+ });
  const [reviewForm,setReviewForm]=useState({
   overall_rating:5,
   teaching_quality:5,
@@ -88,7 +95,12 @@ export default function App(){
  const learnVisual=getSkillVisual(learn);
 
  useEffect(()=>{ loadCatalog(); loadCommunityUsers(); },[]);
- useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); loadAvailability(); loadCommunityUsers(); loadProgression(false); } },[token]);
+ useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); loadAvailability(); loadCommunityUsers(); loadProgression(false); loadNotifications(); loadNotificationPreferences(); } },[token]);
+ useEffect(()=>{
+  if(!token) return;
+  const id=setInterval(()=>loadNotifications(false),20000);
+  return ()=>clearInterval(id);
+ },[token]);
 
  async function refreshAccessToken(){
   const refresh=localStorage.getItem("skillswap_refresh");
@@ -158,6 +170,81 @@ export default function App(){
     if(!searched) setMatches(normalized);
    }
   }catch{}
+ }
+
+ async function loadNotifications(syncUi=true){
+  if(!token && !localStorage.getItem("skillswap_access")) return;
+  try{
+   const res=await api("/notifications/");
+   if(!res.ok) return;
+   const data=await res.json();
+   setNotifications(data.notifications||[]);
+   setNotificationUnread(data.unread_count||0);
+   if(syncUi && notificationOpen) setNotificationOpen(true);
+  }catch{}
+ }
+
+ async function loadNotificationPreferences(){
+  if(!token && !localStorage.getItem("skillswap_access")) return;
+  try{
+   const res=await api("/notifications/preferences/");
+   if(res.ok) setNotificationPreferences(await res.json());
+  }catch{}
+ }
+
+ async function markNotificationRead(item){
+  if(!item || item.is_read) return;
+  const res=await api("/notifications/"+item.id+"/read/",{method:"POST"});
+  if(res.ok){
+   setNotifications(prev=>prev.map(n=>n.id===item.id?{...n,is_read:true}:n));
+   setNotificationUnread(prev=>Math.max(0,prev-1));
+  }
+ }
+
+ async function markAllNotificationsRead(){
+  const res=await api("/notifications/read-all/",{method:"POST"});
+  if(res.ok){
+   setNotifications(prev=>prev.map(n=>({...n,is_read:true})));
+   setNotificationUnread(0);
+  }
+ }
+
+ async function updateNotificationPreference(key,value){
+  setNotificationPreferences(prev=>({...prev,[key]:value}));
+  const res=await api("/notifications/preferences/",{
+   method:"PATCH",body:JSON.stringify({[key]:value})
+  });
+  if(!res.ok) setNotificationPreferences(prev=>({...prev,[key]:!value}));
+ }
+
+ async function handleNotificationAction(item){
+  await markNotificationRead(item);
+  setNotificationOpen(false);
+
+  if(item.action_type==="message" && item.target_id){
+   await openChat(item.target_id);
+   return;
+  }
+  if(item.action_type==="swap"){
+   document.getElementById("requests")?.scrollIntoView({behavior:"smooth"});
+   return;
+  }
+  if(item.action_type==="booking"){
+   document.getElementById("bookings")?.scrollIntoView({behavior:"smooth"});
+   return;
+  }
+  if(item.action_type==="progression"){
+   await loadProgression(false);
+   setProgressionOpen(true);
+   return;
+  }
+  if(item.action_type==="passport"){
+   await openPassport(item.target_id||user?.id);
+   return;
+  }
+  if(item.action_type==="review"){
+   if(user?.id) await openPassport(user.id);
+  }
  }
 
  async function loadProgression(checkUnlock=false){
@@ -614,6 +701,7 @@ export default function App(){
   setWorkspaceOpen(false); setWorkspace(null); setReviewOpen(false); setReviewBooking(null);
   setPassportOpen(false); setPassport(null); setAvailabilityOpen(false); setAvailabilitySlots([]);
   setProgression(null); setProgressionOpen(false); setAchievementUnlock(null);
+  setNotificationOpen(false); setNotifications([]); setNotificationUnread(0);
   setSearched(false); setMatches(communityUsers.map(person=>({...person,score:null,confidence:"",breakdown:{},reasons:[],missing:[],suggested_times:[]})));
  }
 
@@ -759,6 +847,10 @@ export default function App(){
     {user ? <>
       <button className="ghost" onClick={()=>setProfileOpen(true)}>My profile</button>
       <button className="ghost passport-nav-button" disabled={passportLoading} onClick={()=>openPassport(user.id)}>Skill Passport</button>
+      <button className="notification-bell" onClick={()=>{setNotificationOpen(true);loadNotifications();}} aria-label="Notifications">
+       <span className="notification-bell-icon">🔔</span>
+       {notificationUnread>0 && <b>{notificationUnread>99?"99+":notificationUnread}</b>}
+      </button>
       <span className="welcome">Hi, {user.first_name||user.username}</span>
       <button className="ghost" onClick={logout}>Log out</button>
     </> : <>
@@ -1033,6 +1125,18 @@ export default function App(){
     onClose={()=>{setScheduleOpen(false);setSelectedSwap(null)}}
     onSubmit={submitBooking}
   />}
+
+  <NotificationCenter
+    open={notificationOpen}
+    notifications={notifications}
+    unreadCount={notificationUnread}
+    preferences={notificationPreferences}
+    onClose={()=>setNotificationOpen(false)}
+    onMarkRead={markNotificationRead}
+    onMarkAllRead={markAllNotificationsRead}
+    onAction={handleNotificationAction}
+    onPreferenceChange={updateNotificationPreference}
+  />
 
   <ProgressionPanel
     open={progressionOpen}
