@@ -20,6 +20,7 @@ export default function ChatPanel({
   partnerTyping=false,
   partnerOnline=false,
   partnerLastSeen=null,
+  onReport,
   sending,
   booking,
 }){
@@ -116,7 +117,16 @@ export default function ChatPanel({
                 )}
                 <div className="chat-bubble-wrap">
                   <div className="chat-bubble">{message.body}</div>
-                  <small>{formatTime(message.created_at)}{mine ? (message.read_at ? " · ✓✓ Read" : message.delivered_at ? " · ✓✓ Delivered" : " · ✓ Sent") : ""}</small>
+                  <div className="chat-message-meta">
+                    <small>{formatTime(message.created_at)}{mine ? (message.read_at ? " · ✓✓ Read" : message.delivered_at ? " · ✓✓ Delivered" : " · ✓ Sent") : ""}</small>
+                    {!mine&&<button onClick={()=>onReport?.({
+                      target_type:"message",
+                      target_id:message.id,
+                      reported_user:message.sender,
+                      label:"Message from "+(message.sender_name||conversation.partner_name),
+                      icon:"💬"
+                    })}>Report</button>}
+                  </div>
                 </div>
               </div>
             );
