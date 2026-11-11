@@ -8,17 +8,12 @@ import ReviewModal from "./ReviewModal";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
-const previewMatches = [
-  {name:"Alex M.",teaches:"Photography",wants:"Python",score:96,rating:4.8,swaps:18,icon:"📸",preview:true},
-  {name:"Jane K.",teaches:"Graphic Design",wants:"Photography",score:84,rating:4.9,swaps:27,icon:"🎨",preview:true},
-  {name:"Brian T.",teaches:"Video Editing",wants:"React",score:78,rating:4.7,swaps:12,icon:"🎬",preview:true}
-];
-
 export default function App(){
  const [teach,setTeach]=useState("Python");
  const [learn,setLearn]=useState("Photography");
  const [searched,setSearched]=useState(false);
- const [matches,setMatches]=useState(previewMatches);
+ const [matches,setMatches]=useState([]);
+ const [communityUsers,setCommunityUsers]=useState([]);
  const [token,setToken]=useState(localStorage.getItem("skillswap_access") || "");
  const [user,setUser]=useState(null);
  const [authOpen,setAuthOpen]=useState(false);
@@ -78,8 +73,8 @@ export default function App(){
  const teachVisual=getSkillVisual(teach);
  const learnVisual=getSkillVisual(learn);
 
- useEffect(()=>{ loadCatalog(); },[]);
- useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); } },[token]);
+ useEffect(()=>{ loadCatalog(); loadCommunityUsers(); },[]);
+ useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); loadCommunityUsers(); } },[token]);
 
  async function refreshAccessToken(){
   const refresh=localStorage.getItem("skillswap_refresh");
@@ -123,6 +118,29 @@ export default function App(){
   try{
    const res=await fetch(API+"/skills/");
    if(res.ok) setCatalog(await res.json());
+  }catch{}
+ }
+
+ async function loadCommunityUsers(){
+  try{
+   const access=localStorage.getItem("skillswap_access")||"";
+   const headers=access?{Authorization:"Bearer "+access}:{};
+   const res=await fetch(API+"/auth/community/",{headers});
+   if(res.ok){
+    const data=await res.json();
+    setCommunityUsers(data);
+    if(!searched) setMatches(data.map(person=>({
+      ...person,
+      name:person.name,
+      teaches:person.teach_skills?.map(s=>s.name).join(", ")||"No teaching skills yet",
+      wants:person.learn_skills?.map(s=>s.name).join(", ")||"No learning skills yet",
+      rating:person.average_rating||0,
+      swaps:person.completed_swaps||0,
+      score:person.match_score,
+      avatar_url:person.avatar_url,
+      preview:false
+    })));
+   }
   }catch{}
  }
 
@@ -464,7 +482,7 @@ export default function App(){
  function logout(){
   localStorage.removeItem("skillswap_access");
   localStorage.removeItem("skillswap_refresh");
-  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]); setChatOpen(false); setActiveConversation(null); setChatMessages([]); setWorkspaceOpen(false); setWorkspace(null); setReviewOpen(false); setReviewBooking(null); setMatches(previewMatches);
+  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]); setChatOpen(false); setActiveConversation(null); setChatMessages([]); setWorkspaceOpen(false); setWorkspace(null); setReviewOpen(false); setReviewBooking(null); setMatches(communityUsers.map(person=>({...person,name:person.name,teaches:person.teach_skills?.map(s=>s.name).join(", ")||"No teaching skills yet",wants:person.learn_skills?.map(s=>s.name).join(", ")||"No learning skills yet",rating:person.average_rating||0,swaps:person.completed_swaps||0,score:person.match_score,avatar_url:person.avatar_url,preview:false})));
  }
 
  async function saveProfile(e){
@@ -506,7 +524,17 @@ export default function App(){
   setSearched(true);
   document.getElementById("discover")?.scrollIntoView({behavior:"smooth"});
   if(!token){
-   setMatches(previewMatches);
+   setMatches(communityUsers.map(person=>({
+    ...person,
+    name:person.name,
+    teaches:person.teach_skills?.map(s=>s.name).join(", ")||"No teaching skills yet",
+    wants:person.learn_skills?.map(s=>s.name).join(", ")||"No learning skills yet",
+    rating:person.average_rating||0,
+    swaps:person.completed_swaps||0,
+    score:person.match_score,
+    avatar_url:person.avatar_url,
+    preview:false
+   })));
    setAuthMode("login");
    setAuthOpen(true);
    return;
@@ -529,7 +557,10 @@ export default function App(){
     icon:["📸","🎨","🎬","💻","🎸"][i%5],
     preview:false
    })));
-   if(!data.length) setNotice("No compatible users yet. Your profile is ready — matches will appear as the community grows.");
+   if(!data.length){
+    setNotice("No compatible users yet. Showing the wider SkillSwap community instead.");
+    await loadCommunityUsers();
+   }
   }
  }
 
@@ -768,16 +799,47 @@ export default function App(){
     <button className="outline" onClick={openSkills}>Explore all skills ↗</button>
    </div>
 
-   {matches.length ? <div className="cards">{matches.map((m,i)=><article className="card glass" key={(m.user_id||m.name)+"-"+i}>
-    <div className="avatar">{m.icon}</div>
-    <div className="row"><h3>{m.name}</h3><span>{m.score}% match</span></div>
-    <p><b>Can teach you</b> {m.teaches}</p>
-    <p><b>You can teach</b> {m.wants}</p>
-    <small>⭐ {m.rating} · {m.swaps} successful swaps</small>
-    {m.preview || (m.i_teach_them?.length && m.they_teach_me?.length)
-      ? <button className="primary mini" onClick={()=>openProposal(m)}>Propose swap ↗</button>
-      : <button className="outline mini partial-match-button" onClick={()=>openProposal(m)}>One-way match · Add mutual skill</button>}
-   </article>)}</div> :
+   {matches.length ? <div className="cards">{matches.map((m,i)=>{
+    const initials=(m.name||m.username||"SS").split(" ").map(x=>x[0]).join("").slice(0,2).toUpperCase();
+    const hasMutual=!!(m.i_teach_them?.length && m.they_teach_me?.length);
+    const hasAnyMatch=(m.score||0)>0;
+    return <article className="card community-person-card glass" key={(m.user_id||m.name)+"-"+i}>
+      <div className="community-card-top">
+        <div className="community-avatar-wrap">
+          {m.avatar_url
+            ? <img className="community-avatar-img" src={m.avatar_url} alt="" />
+            : <div className="community-avatar-fallback">{initials}</div>}
+        </div>
+        <div className="community-card-head">
+          <h3>{m.name}</h3>
+          {m.location && <small>📍 {m.location}</small>}
+        </div>
+        {m.score!==null && m.score!==undefined
+          ? <span className={"community-match-pill "+(m.score>=100?"strong":m.score>0?"partial":"none")}>{m.score}% match</span>
+          : <span className="community-match-pill community">Community</span>}
+      </div>
+
+      <div className="community-skill-block">
+        <span>Can teach</span>
+        <b>{m.teaches}</b>
+      </div>
+      <div className="community-skill-block">
+        <span>Wants to learn</span>
+        <b>{m.wants}</b>
+      </div>
+
+      <div className="community-card-footer">
+        <small>⭐ {Number(m.rating||0).toFixed(1)} · {m.review_count||0} reviews · {m.swaps||0} swaps</small>
+        {user
+          ? hasMutual
+            ? <button className="primary mini" onClick={()=>openProposal(m)}>Propose swap ↗</button>
+            : hasAnyMatch
+              ? <button className="outline mini partial-match-button" onClick={()=>openProposal(m)}>One-way match</button>
+              : <button className="outline mini" onClick={()=>setNotice(m.name+" is in the community, but your skills do not overlap yet.")}>View member</button>
+          : <button className="primary mini" onClick={()=>{setAuthMode("login");setAuthOpen(true)}}>Log in to connect</button>}
+      </div>
+    </article>
+   })}</div> :
    <div className="empty-state glass"><div>🧭</div><h3>No matches yet</h3><p>Add more teach/learn skills to improve your chances.</p><button className="primary" onClick={()=>setSkillsOpen(true)}>Add skills</button></div>}
   </section>
 
