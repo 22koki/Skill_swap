@@ -1099,3 +1099,141 @@ html{scroll-behavior:smooth}.visual-button{border:0;cursor:pointer}.chip{border:
   .community-match-pill{grid-column:1/-1;width:max-content}
   .community-card-footer{flex-direction:column;align-items:stretch}
 }
+
+/* Skill Passport */
+.passport-nav-button:disabled,.passport-profile-button:disabled{opacity:.55;cursor:wait}
+.passport-backdrop{
+  position:fixed;inset:0;z-index:300;background:rgba(20,12,39,.58);
+  backdrop-filter:blur(8px);display:grid;place-items:center;padding:18px
+}
+.passport-shell{
+  width:min(1040px,100%);max-height:94vh;overflow:auto;position:relative;border-radius:36px;
+  background:#f8f4ff;box-shadow:0 34px 110px rgba(31,17,62,.36);border:1px solid rgba(255,255,255,.75)
+}
+.passport-close{
+  position:absolute;right:18px;top:18px;z-index:20;width:40px;height:40px;border:0;border-radius:50%;
+  background:rgba(255,255,255,.88);color:#4e3d63;font-size:26px;cursor:pointer;box-shadow:0 8px 20px rgba(31,18,58,.12)
+}
+.passport-cover{
+  position:relative;overflow:hidden;min-height:260px;padding:34px 38px;
+  display:grid;align-content:center;justify-items:start;color:#fff;
+  background:linear-gradient(135deg,#211035 0%,#5126a8 55%,#8249e9 100%)
+}
+.passport-cover::after{
+  content:"";position:absolute;width:420px;height:420px;right:-120px;top:-130px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.12);box-shadow:0 0 0 36px rgba(255,255,255,.025),0 0 0 72px rgba(255,255,255,.018)
+}
+.passport-cover-glow{position:absolute;border-radius:50%;filter:blur(6px);pointer-events:none}
+.passport-cover .glow-a{width:260px;height:260px;left:-100px;top:-100px;background:rgba(255,141,102,.25)}
+.passport-cover .glow-b{width:280px;height:280px;right:5%;bottom:-180px;background:rgba(135,94,255,.34)}
+.passport-wordmark{font-size:9px;letter-spacing:.22em;font-weight:900;opacity:.72}
+.passport-emblem{
+  width:64px;height:64px;margin:14px 0;border-radius:20px;display:grid;place-items:center;
+  background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.18);font-size:34px;
+  box-shadow:inset 0 1px rgba(255,255,255,.18)
+}
+.passport-cover h2{font:800 43px Manrope;margin:0;letter-spacing:-.05em}
+.passport-cover p{margin:7px 0 0;opacity:.78;font-size:12px}
+.passport-code{
+  position:absolute;right:38px;bottom:30px;padding:9px 12px;border:1px solid rgba(255,255,255,.22);
+  border-radius:999px;background:rgba(255,255,255,.10);font-size:10px;font-weight:900;letter-spacing:.12em
+}
+.passport-page{padding:24px}
+.passport-identity-card{
+  display:grid;grid-template-columns:auto 1fr auto;gap:20px;align-items:center;padding:20px;
+  border-radius:26px;background:#fff;border:1px solid #e7def1;box-shadow:0 12px 32px rgba(49,27,88,.06)
+}
+.passport-avatar-wrap{position:relative}
+.passport-avatar{
+  width:112px;height:112px;border-radius:28px;object-fit:cover;border:4px solid #fff;
+  box-shadow:0 14px 30px rgba(49,28,91,.14)
+}
+.passport-avatar-fallback{
+  display:grid;place-items:center;background:linear-gradient(145deg,#8d65f5,#ff9a78);color:#fff;font:800 28px Manrope
+}
+.passport-verified{
+  position:absolute;right:-3px;bottom:-3px;width:28px;height:28px;border-radius:50%;
+  display:grid;place-items:center;background:#43c77b;color:#fff;border:4px solid #fff;font-size:10px;font-weight:900
+}
+.passport-kicker{font-size:8px;letter-spacing:.13em;text-transform:uppercase;font-weight:900;color:#7851df}
+.passport-identity-copy h3{font:800 29px Manrope;margin:4px 0 0;letter-spacing:-.04em}
+.passport-identity-copy>p{margin:1px 0 8px;color:#8b8195;font-size:10px}
+.passport-identity-meta{display:flex;gap:8px;flex-wrap:wrap}
+.passport-identity-meta span{padding:7px 9px;border-radius:999px;background:#f4effa;color:#655a70;font-size:8px;font-weight:800}
+.passport-identity-copy blockquote{margin:11px 0 0;font-size:10px;color:#716777;font-style:italic;line-height:1.6}
+.passport-reputation-badge{
+  width:122px;height:122px;border-radius:28px;display:grid;place-items:center;align-content:center;text-align:center;
+  color:#fff;background:linear-gradient(145deg,#2d1949,#6537ca 65%,#8d56e8);
+  box-shadow:0 18px 38px rgba(73,39,151,.22)
+}
+.passport-reputation-badge strong{font:800 34px Manrope;line-height:1}
+.passport-reputation-badge span{font-size:8px;font-weight:900;margin-top:5px}.passport-reputation-badge small{font-size:7px;opacity:.7;margin-top:3px}
+.passport-stats-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0
+}
+.passport-stats-grid>div{
+  padding:15px;border-radius:19px;background:#fff;border:1px solid #e8e0f1;display:grid;gap:3px
+}
+.passport-stats-grid strong{font:800 24px Manrope;color:#5d34c7}.passport-stats-grid span{font-size:8px;color:#847a8e;font-weight:800}
+.passport-section{
+  padding:19px;border-radius:23px;background:#fff;border:1px solid #e8e0f1;
+  box-shadow:0 9px 26px rgba(50,29,91,.045);margin-top:12px
+}
+.passport-section-head{display:flex;justify-content:space-between;align-items:end;gap:12px}
+.passport-section h3{font:800 20px Manrope;margin:4px 0 12px;letter-spacing:-.035em}
+.passport-skills-layout{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.passport-skill-column h4{font:800 12px Manrope;margin:0 0 8px}
+.passport-skill-stamps{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.passport-stamp{
+  border-radius:16px;padding:10px;display:flex;gap:9px;align-items:center;border:1px solid rgba(255,255,255,.78)
+}
+.passport-stamp>span{font-size:23px}.passport-stamp>div{display:grid;min-width:0}
+.passport-stamp b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.passport-stamp small{font-size:7px;color:#756b80;text-transform:capitalize}
+.passport-two-column{display:grid;grid-template-columns:1.05fr .95fr;gap:12px}
+.passport-rating-bars{display:grid;gap:11px}
+.passport-rating-row>div:first-child{display:flex;justify-content:space-between;gap:8px;margin-bottom:5px}
+.passport-rating-row span,.passport-rating-row b{font-size:9px}.passport-rating-row span{color:#776d81}
+.passport-rating-track{height:7px;border-radius:999px;background:#eee8f5;overflow:hidden}
+.passport-rating-track i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#7443ef,#ff8c69)}
+.passport-badges{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.passport-badge{
+  min-height:70px;border-radius:17px;padding:10px;display:grid;place-items:center;text-align:center;
+  background:linear-gradient(145deg,#f2ecff,#fff7f2);border:1px solid #e7def2
+}
+.passport-badge span{font-size:24px}.passport-badge b{font-size:8px}
+.passport-milestones{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.passport-milestone{
+  padding:11px;border-radius:16px;background:#faf8fd;border:1px solid #ece5f3;display:flex;gap:9px;align-items:center
+}
+.passport-milestone>span{font-size:22px}.passport-milestone>div{display:grid}
+.passport-milestone b{font-size:9px}.passport-milestone small{font-size:7px;color:#8c8295}
+.passport-journeys{display:grid;gap:8px}
+.passport-journey{
+  display:grid;grid-template-columns:100px 1fr auto;gap:12px;align-items:center;
+  padding:11px 12px;border-radius:16px;background:#faf8fd;border:1px solid #ece5f3
+}
+.passport-journey-date{font-size:8px;color:#80758a;font-weight:800}
+.passport-journey-exchange{display:flex;align-items:center;gap:7px;min-width:0}
+.passport-journey-exchange span{padding:6px 8px;border-radius:999px;font-size:8px;font-weight:800}
+.passport-journey-exchange b{color:#7747eb}
+.passport-journey-meta{display:grid;text-align:right}.passport-journey-meta span{font-size:8px;font-weight:800}.passport-journey-meta small{font-size:7px;color:#91869a}
+.passport-empty-mini{padding:14px;border-radius:14px;background:#faf8fd;color:#8a8094;font-size:9px}
+.passport-empty-large{text-align:center;padding:28px;color:#887d92;font-size:10px}
+.passport-footer{
+  margin-top:14px;padding:14px 2px 2px;display:flex;justify-content:space-between;gap:12px;
+  border-top:1px dashed #d9cee7;color:#8b8095;font-size:8px;text-transform:uppercase;letter-spacing:.08em
+}
+.passport-footer b{color:#5d35c5}
+@media(max-width:800px){
+  .passport-identity-card{grid-template-columns:auto 1fr}.passport-reputation-badge{grid-column:1/-1;width:100%;height:auto;padding:14px;border-radius:18px}
+  .passport-stats-grid{grid-template-columns:1fr 1fr}
+  .passport-skills-layout,.passport-two-column{grid-template-columns:1fr}
+  .passport-milestones{grid-template-columns:1fr 1fr}
+}
+@media(max-width:560px){
+  .passport-page{padding:14px}.passport-cover{padding:28px 20px}.passport-cover h2{font-size:34px}.passport-code{position:static;margin-top:16px}
+  .passport-identity-card{grid-template-columns:1fr;justify-items:start}.passport-avatar{width:92px;height:92px}
+  .passport-stats-grid,.passport-skill-stamps,.passport-badges,.passport-milestones{grid-template-columns:1fr}
+  .passport-journey{grid-template-columns:1fr}.passport-journey-meta{text-align:left}
+}
