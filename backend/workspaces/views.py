@@ -5,12 +5,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from bookings.models import Booking
-from .models import SessionWorkspace, WorkspaceResource, WorkspaceChecklistItem
+from .models import SessionWorkspace, WorkspaceResource, WorkspaceChecklistItem, SessionRecap
 from .ai_planner import generate_learning_plan, checklist_items_from_plan
+from .ai_recap import generate_session_recap, recap_tasks
 from .serializers import (
     SessionWorkspaceSerializer,
     WorkspaceResourceSerializer,
     WorkspaceChecklistItemSerializer,
+    SessionRecapSerializer,
 )
 
 def booking_for_user(request, booking_id):
@@ -229,6 +231,100 @@ class AIPlanChecklistView(APIView):
             )
             created.append(item)
             existing.add(text)
+
+        return Response({
+            "created": WorkspaceChecklistItemSerializer(created, many=True).data,
+            "workspace": SessionWorkspaceSerializer(workspace, context={"request": request}).data,
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class SessionRecapGenerateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, booking_id):
+        booking = booking_for_user(request, booking_id)
+        if not booking:
+            return Response({"detail": "You are not part of this booking."}, status=403)
+        if booking.status != Booking.Status.COMPLETED:
+            return Response({"detail": "Complete the session before generating a recap."}, status=400)
+
+        workspace, _ = SessionWorkspace.objects.get_or_create(booking=booking)
+        confidence = request.data.get("confidence", 3)
+        try:
+            confidence = max(1, min(int(confidence), 5))
+        except (TypeError, ValueError):
+            confidence = 3
+
+        reflection = str(request.data.get("reflection", "")).strip()[:2000]
+        challenge = str(request.data.get("challenge", "")).strip()[:500]
+
+        swap = booking.swap
+        if swap.requester == request.user:
+            skill = swap.requested_skill.name
+        else:
+            skill = swap.offered_skill.name
+
+        completed_items = list(workspace.checklist.filter(is_done=True).values_list("text", flat=True))
+        pending_items = list(workspace.checklist.filter(is_done=False).values_list("text", flat=True))
+        checklist_total = len(completed_items) + len(pending_items)
+        checklist_progress = round((len(completed_items) / checklist_total) * 100) if checklist_total else 0
+        progress = max(workspace.progress_percentage, checklist_progress)
+
+        notes = "\n".join(filter(None, [workspace.shared_notes, reflection]))
+        goal = workspace.ai_goal or workspace.goals
+        recap_data, source = generate_session_recap(
+            skill=skill,
+            goal=goal,
+            notes=notes,
+            completed_items=completed_items,
+            pending_items=pending_items,
+            confidence=confidence,
+            challenge=challenge,
+            progress=progress,
+            plan=workspace.ai_plan,
+        )
+
+        recap, _ = SessionRecap.objects.update_or_create(
+            workspace=workspace,
+            user=request.user,
+            defaults={
+                "reflection": reflection,
+                "challenge": challenge,
+                "confidence": confidence,
+                "recap": recap_data,
+                "source": source,
+            },
+        )
+
+        return Response(SessionRecapSerializer(recap).data)
+
+
+class SessionRecapChecklistView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, booking_id):
+        booking = booking_for_user(request, booking_id)
+        if not booking:
+            return Response({"detail": "You are not part of this booking."}, status=403)
+
+        workspace, _ = SessionWorkspace.objects.get_or_create(booking=booking)
+        recap = workspace.recaps.filter(user=request.user).first()
+        if not recap or not recap.recap:
+            return Response({"detail": "Generate your session recap first."}, status=400)
+
+        created = []
+        existing = set(workspace.checklist.values_list("text", flat=True))
+        for text in recap_tasks(recap.recap):
+            clean = text[:220]
+            if clean in existing:
+                continue
+            item = WorkspaceChecklistItem.objects.create(
+                workspace=workspace,
+                text=clean,
+                created_by=request.user,
+            )
+            created.append(item)
+            existing.add(clean)
 
         return Response({
             "created": WorkspaceChecklistItemSerializer(created, many=True).data,
