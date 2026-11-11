@@ -4,8 +4,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Profile
-from .serializers import RegisterSerializer, UserSerializer
+from .models import Profile, AvailabilitySlot
+from .serializers import RegisterSerializer, UserSerializer, AvailabilitySlotSerializer
+from .matching import build_match_data
 
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
@@ -45,19 +46,12 @@ class CommunityUsersView(APIView):
 
     def get(self, request):
         from django.contrib.auth.models import User
-        from skills.models import Skill, UserSkill
+        from skills.models import UserSkill
 
         current_user = request.user if request.user.is_authenticated else None
         users = User.objects.all().order_by("date_joined")
-
         if current_user:
             users = users.exclude(pk=current_user.pk)
-            mine = UserSkill.objects.filter(user=current_user)
-            my_teach_ids = set(mine.filter(kind=UserSkill.Kind.TEACH).values_list("skill_id", flat=True))
-            my_learn_ids = set(mine.filter(kind=UserSkill.Kind.LEARN).values_list("skill_id", flat=True))
-        else:
-            my_teach_ids = set()
-            my_learn_ids = set()
 
         results = []
         for user in users:
@@ -66,22 +60,7 @@ class CommunityUsersView(APIView):
             teach_items = list(their.filter(kind=UserSkill.Kind.TEACH))
             learn_items = list(their.filter(kind=UserSkill.Kind.LEARN))
 
-            their_teach_ids = {item.skill_id for item in teach_items}
-            their_learn_ids = {item.skill_id for item in learn_items}
-
-            if current_user and (my_teach_ids or my_learn_ids):
-                they_teach_me = my_learn_ids & their_teach_ids
-                i_teach_them = my_teach_ids & their_learn_ids
-                if they_teach_me and i_teach_them:
-                    score = 100
-                elif they_teach_me or i_teach_them:
-                    score = 60
-                else:
-                    score = 0
-            else:
-                they_teach_me = set()
-                i_teach_them = set()
-                score = None
+            match = build_match_data(current_user, user) if current_user else None
 
             results.append({
                 "user_id": user.id,
@@ -89,10 +68,10 @@ class CommunityUsersView(APIView):
                 "username": user.username,
                 "avatar_url": profile.avatar_url,
                 "location": profile.location,
+                "session_preference": profile.session_preference,
                 "average_rating": float(profile.average_rating),
                 "review_count": profile.review_count,
                 "completed_swaps": profile.completed_swaps,
-                "match_score": score,
                 "teach_skills": [
                     {"id": item.skill_id, "name": item.skill.name, "level": item.level}
                     for item in teach_items
@@ -101,13 +80,19 @@ class CommunityUsersView(APIView):
                     {"id": item.skill_id, "name": item.skill.name, "level": item.level}
                     for item in learn_items
                 ],
-                "they_teach_me": list(Skill.objects.filter(id__in=they_teach_me).values("id", "name")),
-                "i_teach_them": list(Skill.objects.filter(id__in=i_teach_them).values("id", "name")),
+                "score": match["score"] if match else None,
+                "confidence": match["confidence"] if match else "",
+                "breakdown": match["breakdown"] if match else {},
+                "reasons": match["reasons"] if match else [],
+                "missing": match["missing"] if match else [],
+                "suggested_times": match["suggested_times"] if match else [],
+                "they_teach_me": match["they_teach_me"] if match else [],
+                "i_teach_them": match["i_teach_them"] if match else [],
             })
 
         results.sort(
             key=lambda item: (
-                -(item["match_score"] if item["match_score"] is not None else -1),
+                -(item["score"] if item["score"] is not None else -1),
                 -item["average_rating"],
                 -item["completed_swaps"],
             )
@@ -233,3 +218,21 @@ class SkillPassportView(APIView):
             "milestones": milestones,
             "recent_journeys": journeys,
         })
+
+
+class MyAvailabilityView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        slots = AvailabilitySlot.objects.filter(user=request.user)
+        return Response(AvailabilitySlotSerializer(slots, many=True).data)
+
+    def put(self, request):
+        serializer = AvailabilitySlotSerializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+        AvailabilitySlot.objects.filter(user=request.user).delete()
+        created = [
+            AvailabilitySlot.objects.create(user=request.user, **item)
+            for item in serializer.validated_data
+        ]
+        return Response(AvailabilitySlotSerializer(created, many=True).data)
