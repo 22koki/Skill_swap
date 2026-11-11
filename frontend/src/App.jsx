@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import RequestsPanel from "./RequestsPanel";
 import BookingsPanel from "./BookingsPanel";
 import ScheduleSwapModal from "./ScheduleSwapModal";
@@ -19,6 +19,7 @@ import UniversalSearch from "./UniversalSearch";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
+const WS_BASE = API.replace(/^http/,"ws").replace(/\/api$/,"");
 export default function App(){
  const [teach,setTeach]=useState("Python");
  const [learn,setLearn]=useState("Photography");
@@ -78,6 +79,14 @@ export default function App(){
  const [chatMessages,setChatMessages]=useState([]);
  const [chatDraft,setChatDraft]=useState("");
  const [chatSending,setChatSending]=useState(false);
+ const [chatPartnerTyping,setChatPartnerTyping]=useState(false);
+ const [chatPartnerOnline,setChatPartnerOnline]=useState(false);
+ const [chatPartnerLastSeen,setChatPartnerLastSeen]=useState(null);
+ const activitySocketRef=useRef(null);
+ const chatSocketRef=useRef(null);
+ const circleSocketRef=useRef(null);
+ const typingTimerRef=useRef(null);
+ const circleTypingTimerRef=useRef(null);
  const [workspaceOpen,setWorkspaceOpen]=useState(false);
  const [workspace,setWorkspace]=useState(null);
  const [workspaceForm,setWorkspaceForm]=useState({goals:"",lesson_plan:"",shared_notes:"",progress_percentage:0});
@@ -125,6 +134,8 @@ export default function App(){
  const [activeCircle,setActiveCircle]=useState(null);
  const [circleMessages,setCircleMessages]=useState([]);
  const [circleFocusId,setCircleFocusId]=useState(null);
+ const [circleOnlineIds,setCircleOnlineIds]=useState([]);
+ const [circleTypingUsers,setCircleTypingUsers]=useState([]);
  const [universalSearchOpen,setUniversalSearchOpen]=useState(false);
  const [universalSearchQuery,setUniversalSearchQuery]=useState("");
  const [universalSearchData,setUniversalSearchData]=useState({people:[],skills:[],circles:[],mentors:[],counts:{}});
@@ -148,9 +159,134 @@ export default function App(){
  useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); loadAvailability(); loadCommunityUsers(); loadProgression(false); loadNotifications(); loadNotificationPreferences(); } },[token]);
  useEffect(()=>{
   if(!token) return;
-  const id=setInterval(()=>loadNotifications(false),20000);
+  const id=setInterval(()=>loadNotifications(false),60000);
   return ()=>clearInterval(id);
  },[token]);
+
+ useEffect(()=>{
+  if(!token) return;
+  let disposed=false;
+  let retryTimer=null;
+
+  function connect(){
+   const access=localStorage.getItem("skillswap_access")||token;
+   if(!access||disposed) return;
+   const socket=new WebSocket(WS_BASE+"/ws/activity/?token="+encodeURIComponent(access));
+   activitySocketRef.current=socket;
+
+   socket.onmessage=event=>{
+    let data;
+    try{data=JSON.parse(event.data)}catch{return}
+    if(data.event==="notification"&&data.notification){
+     const item=data.notification;
+     setNotifications(prev=>[item,...prev.filter(n=>n.id!==item.id)]);
+     if(!item.is_read) setNotificationUnread(prev=>prev+1);
+     setNotice(item.title+(item.body?" · "+item.body:""));
+     loadConversations();
+     if(item.action_type==="booking") loadBookings();
+     if(item.action_type==="swap") loadSwaps();
+    }
+    if(data.event==="presence"&&data.presence){
+     const p=data.presence;
+     if(activeConversation?.partner_id===p.user_id){
+      setChatPartnerOnline(!!p.online);
+      setChatPartnerLastSeen(p.last_seen||null);
+     }
+    }
+   };
+   socket.onclose=()=>{
+    if(activitySocketRef.current===socket) activitySocketRef.current=null;
+    if(!disposed) retryTimer=setTimeout(connect,2500);
+   };
+  }
+
+  connect();
+  return ()=>{
+   disposed=true;
+   if(retryTimer) clearTimeout(retryTimer);
+   activitySocketRef.current?.close();
+   activitySocketRef.current=null;
+  };
+ },[token]);
+
+ useEffect(()=>{
+  if(!chatOpen||!activeConversation?.swap||!token) return;
+  const access=localStorage.getItem("skillswap_access")||token;
+  const socket=new WebSocket(WS_BASE+"/ws/chat/"+activeConversation.swap+"/?token="+encodeURIComponent(access));
+  chatSocketRef.current=socket;
+  setChatPartnerTyping(false);
+
+  socket.onopen=()=>{
+   socket.send(JSON.stringify({event:"read"}));
+   activitySocketRef.current?.send(JSON.stringify({event:"presence_query",user_id:activeConversation.partner_id}));
+  };
+  socket.onmessage=event=>{
+   let data;
+   try{data=JSON.parse(event.data)}catch{return}
+   if(data.event==="message"&&data.message){
+    setChatMessages(prev=>prev.some(m=>m.id===data.message.id)?prev:[...prev,data.message]);
+    if(data.message.sender!==user?.id){
+     socket.send(JSON.stringify({event:"read"}));
+    }
+    loadConversations();
+   }else if(data.event==="typing"){
+    setChatPartnerTyping(!!data.typing);
+   }else if(data.event==="presence"){
+    setChatPartnerOnline(!!data.online);
+   }else if(data.event==="read"){
+    const ids=new Set(data.message_ids||[]);
+    setChatMessages(prev=>prev.map(m=>ids.has(m.id)?{...m,read_at:data.read_at}:m));
+    loadConversations();
+   }
+  };
+  socket.onclose=()=>{
+   if(chatSocketRef.current===socket) chatSocketRef.current=null;
+  };
+
+  return ()=>{
+   socket.close();
+   if(chatSocketRef.current===socket) chatSocketRef.current=null;
+   setChatPartnerTyping(false);
+  };
+ },[chatOpen,activeConversation?.swap,token]);
+
+ useEffect(()=>{
+  if(!circlesOpen||!activeCircle?.id||!activeCircle?.membership||!token) return;
+  const access=localStorage.getItem("skillswap_access")||token;
+  const socket=new WebSocket(WS_BASE+"/ws/circles/"+activeCircle.id+"/?token="+encodeURIComponent(access));
+  circleSocketRef.current=socket;
+  setCircleOnlineIds([]);
+  setCircleTypingUsers([]);
+
+  socket.onmessage=event=>{
+   let data;
+   try{data=JSON.parse(event.data)}catch{return}
+   if(data.event==="message"&&data.message){
+    setCircleMessages(prev=>prev.some(m=>m.id===data.message.id)?prev:[...prev,data.message]);
+   }else if(data.event==="presence"){
+    setCircleOnlineIds(prev=>{
+     const next=new Set(prev);
+     if(data.online) next.add(data.user_id); else next.delete(data.user_id);
+     return Array.from(next);
+    });
+   }else if(data.event==="typing"){
+    setCircleTypingUsers(prev=>{
+     const others=prev.filter(item=>item.user_id!==data.user_id);
+     return data.typing?[...others,{user_id:data.user_id,name:data.user_name}]:others;
+    });
+   }
+  };
+  socket.onclose=()=>{
+   if(circleSocketRef.current===socket) circleSocketRef.current=null;
+  };
+
+  return ()=>{
+   socket.close();
+   if(circleSocketRef.current===socket) circleSocketRef.current=null;
+   setCircleOnlineIds([]);
+   setCircleTypingUsers([]);
+  };
+ },[circlesOpen,activeCircle?.id,activeCircle?.membership?.id,token]);
 
  useEffect(()=>{
   if(!universalSearchOpen) return;
@@ -346,13 +482,29 @@ export default function App(){
  }
 
  async function sendCircleMessage(circleId,body){
+  const socket=circleSocketRef.current;
+  if(socket&&socket.readyState===WebSocket.OPEN){
+   socket.send(JSON.stringify({event:"message",body}));
+   return;
+  }
   const res=await api("/circles/"+circleId+"/messages/",{method:"POST",body:JSON.stringify({body})});
   if(res.ok){
    const data=await res.json();
-   setCircleMessages(prev=>[...prev,data]);
+   setCircleMessages(prev=>prev.some(m=>m.id===data.id)?prev:[...prev,data]);
   }else{
    const data=await res.json().catch(()=>({}));
    setNotice(data.detail||"Could not send message.");
+  }
+ }
+
+ function sendCircleTyping(typing){
+  const socket=circleSocketRef.current;
+  if(socket&&socket.readyState===WebSocket.OPEN){
+   socket.send(JSON.stringify({event:"typing",typing}));
+   if(circleTypingTimerRef.current) clearTimeout(circleTypingTimerRef.current);
+   if(typing) circleTypingTimerRef.current=setTimeout(()=>{
+    socket.readyState===WebSocket.OPEN&&socket.send(JSON.stringify({event:"typing",typing:false}));
+   },1200);
   }
  }
 
@@ -900,24 +1052,45 @@ export default function App(){
 
  async function sendChatMessage(){
   if(!activeConversation?.swap || !chatDraft.trim()) return;
+  const body=chatDraft.trim();
+  const socket=chatSocketRef.current;
+  if(socket&&socket.readyState===WebSocket.OPEN){
+   setChatDraft("");
+   setChatSending(true);
+   socket.send(JSON.stringify({event:"typing",typing:false}));
+   socket.send(JSON.stringify({event:"message",body}));
+   setTimeout(()=>setChatSending(false),180);
+   return;
+  }
   setChatSending(true);
   try{
    const res=await api("/messages/swaps/"+activeConversation.swap+"/",{
     method:"POST",
-    body:JSON.stringify({body:chatDraft.trim()})
+    body:JSON.stringify({body})
    });
    const data=await res.json();
    if(!res.ok){
     setNotice(data.detail||"Could not send message.");
     return;
    }
-   setChatMessages(prev=>[...prev,data]);
+   setChatMessages(prev=>prev.some(m=>m.id===data.id)?prev:[...prev,data]);
    setChatDraft("");
    loadConversations();
   }catch{
    setNotice("Could not send message.");
   }finally{
    setChatSending(false);
+  }
+ }
+
+ function sendChatTyping(typing){
+  const socket=chatSocketRef.current;
+  if(socket&&socket.readyState===WebSocket.OPEN){
+   socket.send(JSON.stringify({event:"typing",typing}));
+   if(typingTimerRef.current) clearTimeout(typingTimerRef.current);
+   if(typing) typingTimerRef.current=setTimeout(()=>{
+    socket.readyState===WebSocket.OPEN&&socket.send(JSON.stringify({event:"typing",typing:false}));
+   },1200);
   }
  }
 
@@ -1173,7 +1346,7 @@ export default function App(){
   localStorage.removeItem("skillswap_access");
   localStorage.removeItem("skillswap_refresh");
   setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]);
-  setChatOpen(false); setActiveConversation(null); setChatMessages([]);
+  setChatOpen(false); setActiveConversation(null); setChatMessages([]); setChatPartnerTyping(false); setChatPartnerOnline(false); setChatPartnerLastSeen(null);
   setWorkspaceOpen(false); setWorkspace(null); setReviewOpen(false); setReviewBooking(null);
   setPassportOpen(false); setPassport(null); setAvailabilityOpen(false); setAvailabilitySlots([]);
   setProgression(null); setProgressionOpen(false); setAchievementUnlock(null);
@@ -1753,6 +1926,9 @@ export default function App(){
     onJoin={joinCircle}
     onLeave={leaveCircle}
     onSendMessage={sendCircleMessage}
+    onTyping={sendCircleTyping}
+    onlineMemberIds={circleOnlineIds}
+    typingUsers={circleTypingUsers}
     onAddTask={addCircleTask}
     onToggleTask={toggleCircleTask}
     onAddResource={addCircleResource}
@@ -1868,6 +2044,10 @@ export default function App(){
     onClose={()=>setChatOpen(false)}
     onSend={sendChatMessage}
     onRefresh={refreshActiveChat}
+    onTyping={sendChatTyping}
+    partnerTyping={chatPartnerTyping}
+    partnerOnline={chatPartnerOnline}
+    partnerLastSeen={chatPartnerLastSeen}
     sending={chatSending}
     booking={activeConversation ? bookings.find(b=>b.swap===activeConversation.swap && b.status==="scheduled") : null}
   />
