@@ -2228,6 +2228,7 @@ export default function App(){
     partnerTyping={chatPartnerTyping}
     partnerOnline={chatPartnerOnline}
     partnerLastSeen={chatPartnerLastSeen}
+    onReport={openReport}
     sending={chatSending}
     booking={activeConversation ? bookings.find(b=>b.swap===activeConversation.swap && b.status==="scheduled") : null}
   />
