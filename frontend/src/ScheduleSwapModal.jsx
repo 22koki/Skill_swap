@@ -21,13 +21,13 @@ export default function ScheduleSwapModal({
   onRefreshSuggestions,
   scheduleError,
 }) {
+  useEffect(()=>{
+    if(swap) onRefreshSuggestions?.(Number(form.duration_minutes||60));
+  },[swap?.id]);
+
   if (!swap) return null;
   const left = getSkillVisual(swap.requested_skill_name);
   const right = getSkillVisual(swap.offered_skill_name);
-
-  useEffect(()=>{
-    onRefreshSuggestions?.(Number(form.duration_minutes||60));
-  },[swap?.id]);
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
