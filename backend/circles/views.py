@@ -1,3 +1,5 @@
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status
@@ -141,7 +143,14 @@ class CircleMessagesView(APIView):
         if not body:
             return Response({"detail": "Message cannot be empty."}, status=400)
         message = CircleMessage.objects.create(circle=circle, sender=request.user, body=body[:3000])
-        return Response(CircleMessageSerializer(message).data, status=status.HTTP_201_CREATED)
+        payload = CircleMessageSerializer(message).data
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f"circle_{circle.id}",
+                {"type": "circle_message_event", "message": payload},
+            )
+        return Response(payload, status=status.HTTP_201_CREATED)
 
 
 class CircleSessionsView(APIView):
