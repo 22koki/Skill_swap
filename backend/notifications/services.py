@@ -15,9 +15,9 @@ def _broadcast_notification(notification):
     if not channel_layer:
         return
     async_to_sync(channel_layer.group_send)(
-        f"user.{notification.user_id}",
+        f"user_{notification.user_id}",
         {
-            "type": "notification.event",
+            "type": "notification_event",
             "notification": NotificationSerializer(notification).data,
         },
     )
