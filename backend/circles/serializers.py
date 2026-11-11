@@ -112,14 +112,14 @@ class SkillCircleSerializer(serializers.ModelSerializer):
     class Meta:
         model = SkillCircle
         fields = [
-            "id", "title", "slug", "circle_type", "primary_skill", "primary_skill_name",
+            "id", "title", "slug", "circle_type", "primary_skill", "primary_skill_name", "created_by",
             "primary_skill_category", "description", "goal", "cover_emoji", "creator_name",
             "is_public", "member_count", "mentor_count", "learner_count", "membership",
             "members", "sessions", "tasks", "resources", "next_session", "progress_percentage",
             "ai_plan", "ai_plan_source", "ai_plan_updated_at", "created_at", "updated_at",
         ]
         read_only_fields = [
-            "id", "slug", "creator_name", "member_count", "mentor_count", "learner_count",
+            "id", "slug", "created_by", "creator_name", "member_count", "mentor_count", "learner_count",
             "membership", "members", "sessions", "tasks", "resources", "next_session",
             "progress_percentage", "ai_plan", "ai_plan_source", "ai_plan_updated_at",
             "created_at", "updated_at",
