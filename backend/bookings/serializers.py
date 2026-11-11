@@ -7,6 +7,7 @@ class BookingSerializer(serializers.ModelSerializer):
     partner_profile = serializers.SerializerMethodField()
     learn_skill_name = serializers.SerializerMethodField()
     teach_skill_name = serializers.SerializerMethodField()
+    review_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
@@ -14,7 +15,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "id", "swap", "partner_name", "partner_profile",
             "learn_skill_name", "teach_skill_name",
             "starts_at", "duration_minutes", "mode", "meeting_link",
-            "location_note", "note", "status", "created_at", "updated_at",
+            "location_note", "note", "status", "review_status", "created_at", "updated_at",
         ]
         read_only_fields = ["status", "created_at", "updated_at"]
 
@@ -56,6 +57,16 @@ class BookingSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return obj.swap.offered_skill.name
         return obj.swap.offered_skill.name if obj.swap.requester == request.user else obj.swap.requested_skill.name
+
+    def get_review_status(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return {"can_review": False, "reviewed": False}
+        reviewed = obj.reviews.filter(reviewer=request.user).exists()
+        return {
+            "can_review": obj.status == Booking.Status.COMPLETED and not reviewed,
+            "reviewed": reviewed,
+        }
 
     def validate(self, attrs):
         request = self.context["request"]
