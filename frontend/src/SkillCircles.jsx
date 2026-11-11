@@ -451,18 +451,20 @@ export default function SkillCircles({
                   <div className="circle-panel-head"><div><small>MEMBERS</small><h3>Circle people</h3></div></div>
                   <div className="circle-members-list">
                     {(circle.members||[]).map(member=>(
-                      <button key={member.id} onClick={()=>onPassport(member.user_id)}>
-                        {member.avatar_url?<img src={member.avatar_url} alt=""/>:<span>{initials(member.name)}</span>}
-                        <div><b>{member.name}</b><small>@{member.username}</small></div>
-                        <span className={"circle-member-presence "+(onlineMemberIds.includes(member.user_id)?"online":"")}></span>
-                        <em className={member.role}>{member.role}</em>
-                        {member.is_muted&&<small className="circle-muted-label">Muted</small>}
-                        {isMentor&&member.user_id!==circle.created_by&&member.user_id!==user?.id&&<div className="circle-member-mod-actions" onClick={e=>e.stopPropagation()}>
+                      <div className="circle-member-row" key={member.id}>
+                        <button className="circle-member-profile" onClick={()=>onPassport(member.user_id)}>
+                          {member.avatar_url?<img src={member.avatar_url} alt=""/>:<span>{initials(member.name)}</span>}
+                          <div><b>{member.name}</b><small>@{member.username}</small></div>
+                          <span className={"circle-member-presence "+(onlineMemberIds.includes(member.user_id)?"online":"")}></span>
+                          <em className={member.role}>{member.role}</em>
+                          {member.is_muted&&<small className="circle-muted-label">Muted</small>}
+                        </button>
+                        {isMentor&&member.user_id!==circle.created_by&&member.user_id!==user?.id&&<div className="circle-member-mod-actions">
                           <button title={member.is_muted?"Unmute":"Mute"} onClick={()=>onModerateMember?.(circle.id,member.user_id,member.is_muted?"unmute":"mute")}>{member.is_muted?"🔊":"🔇"}</button>
                           <button title={member.role==="mentor"?"Make learner":"Make mentor"} onClick={()=>onModerateMember?.(circle.id,member.user_id,member.role==="mentor"?"demote":"promote")}>{member.role==="mentor"?"🌱":"🎓"}</button>
                           <button title="Remove member" onClick={()=>onModerateMember?.(circle.id,member.user_id,"remove")}>✕</button>
                         </div>}
-                      </button>
+                      </div>
                     ))}
                   </div>
                 </section>
