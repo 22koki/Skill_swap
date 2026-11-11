@@ -11,6 +11,7 @@ import SmartMatchCard from "./SmartMatchCard";
 import ProgressionPanel from "./ProgressionPanel";
 import AchievementUnlock from "./AchievementUnlock";
 import NotificationCenter from "./NotificationCenter";
+import SkillNetwork from "./SkillNetwork";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -93,6 +94,9 @@ export default function App(){
  const [notificationPreferences,setNotificationPreferences]=useState({
   swaps:true,messages:true,sessions:true,reviews:true,progress:true,matches:true
  });
+ const [networkOpen,setNetworkOpen]=useState(false);
+ const [networkData,setNetworkData]=useState(null);
+ const [networkLoading,setNetworkLoading]=useState(false);
  const [reviewForm,setReviewForm]=useState({
   overall_rating:5,
   teaching_quality:5,
@@ -184,6 +188,37 @@ export default function App(){
     if(!searched) setMatches(normalized);
    }
   }catch{}
+ }
+
+ async function openSkillNetwork(){
+  setNetworkOpen(true);
+  if(networkData) return;
+  setNetworkLoading(true);
+  try{
+   const res=await api("/auth/network/");
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not load the Skill Network.");
+    setNetworkOpen(false);
+    return;
+   }
+   setNetworkData(data);
+  }catch{
+   setNotice("Could not load the Skill Network.");
+   setNetworkOpen(false);
+  }finally{
+   setNetworkLoading(false);
+  }
+ }
+
+ async function refreshSkillNetwork(){
+  setNetworkLoading(true);
+  try{
+   const res=await api("/auth/network/");
+   if(res.ok) setNetworkData(await res.json());
+  }finally{
+   setNetworkLoading(false);
+  }
  }
 
  async function loadNotifications(syncUi=true){
@@ -827,6 +862,7 @@ export default function App(){
   setPassportOpen(false); setPassport(null); setAvailabilityOpen(false); setAvailabilitySlots([]);
   setProgression(null); setProgressionOpen(false); setAchievementUnlock(null);
   setNotificationOpen(false); setNotifications([]); setNotificationUnread(0);
+  setNetworkOpen(false); setNetworkData(null);
   setSearched(false); setMatches(communityUsers.map(person=>({...person,score:null,confidence:"",breakdown:{},reasons:[],missing:[],suggested_times:[]})));
  }
 
@@ -967,6 +1003,7 @@ export default function App(){
     </button>}
     <a href="#how">How it works</a>
     <a href="#community">Community</a>
+    <button className="nav-network-button" onClick={openSkillNetwork}>Skill Network</button>
    </div>
    <div className="actions">
     {user ? <>
@@ -1250,6 +1287,17 @@ export default function App(){
     onClose={()=>{setScheduleOpen(false);setSelectedSwap(null)}}
     onSubmit={submitBooking}
   />}
+
+  <SkillNetwork
+    open={networkOpen}
+    data={networkData}
+    loading={networkLoading}
+    onClose={()=>setNetworkOpen(false)}
+    onPassport={openPassport}
+    onPropose={openProposal}
+    currentUser={user}
+    onRefresh={refreshSkillNetwork}
+  />
 
   <NotificationCenter
     open={notificationOpen}
