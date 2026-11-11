@@ -1,6 +1,6 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import RegisterView, MeView, PublicProfileView, CommunityUsersView, SkillPassportView, MyAvailabilityView, UserProgressionView, SkillNetworkView, UniversalSearchView
+from .views import RegisterView, MeView, PublicProfileView, CommunityUsersView, SkillPassportView, MyAvailabilityView, UserProgressionView, SkillNetworkView, UniversalSearchView, BlockedUsersView, UserBlockView, SafetyReportCreateView, MySafetyView, ModerationQueueView, ModerationReportActionView
 
 urlpatterns = [
     path("register/", RegisterView.as_view(), name="register"),
@@ -14,4 +14,10 @@ urlpatterns = [
     path("availability/", MyAvailabilityView.as_view(), name="my-availability"),
     path("passports/<int:user_id>/", SkillPassportView.as_view(), name="skill-passport"),
     path("progression/<int:user_id>/", UserProgressionView.as_view(), name="user-progression"),
+    path("safety/", MySafetyView.as_view(), name="my-safety"),
+    path("safety/blocked/", BlockedUsersView.as_view(), name="blocked-users"),
+    path("safety/block/<int:user_id>/", UserBlockView.as_view(), name="user-block"),
+    path("safety/reports/", SafetyReportCreateView.as_view(), name="safety-report-create"),
+    path("safety/moderation/", ModerationQueueView.as_view(), name="moderation-queue"),
+    path("safety/moderation/<int:pk>/<str:action>/", ModerationReportActionView.as_view(), name="moderation-report-action"),
 ]

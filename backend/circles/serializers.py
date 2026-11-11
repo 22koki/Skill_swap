@@ -20,7 +20,7 @@ class CircleMemberSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CircleMember
-        fields = ["id", "user_id", "name", "username", "avatar_url", "role", "joined_at"]
+        fields = ["id", "user_id", "name", "username", "avatar_url", "role", "is_muted", "joined_at"]
 
     def get_name(self, obj):
         return obj.user.get_full_name() or obj.user.username

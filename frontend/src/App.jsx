@@ -16,6 +16,8 @@ import NotificationCenter from "./NotificationCenter";
 import SkillNetwork from "./SkillNetwork";
 import SkillCircles from "./SkillCircles";
 import UniversalSearch from "./UniversalSearch";
+import ReportModal from "./ReportModal";
+import SafetyCenter from "./SafetyCenter";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -141,6 +143,14 @@ export default function App(){
  const [universalSearchQuery,setUniversalSearchQuery]=useState("");
  const [universalSearchData,setUniversalSearchData]=useState({people:[],skills:[],circles:[],mentors:[],counts:{}});
  const [universalSearchLoading,setUniversalSearchLoading]=useState(false);
+ const [safetyOpen,setSafetyOpen]=useState(false);
+ const [safetyData,setSafetyData]=useState(null);
+ const [safetyLoading,setSafetyLoading]=useState(false);
+ const [moderationQueue,setModerationQueue]=useState([]);
+ const [moderationLoading,setModerationLoading]=useState(false);
+ const [reportTarget,setReportTarget]=useState(null);
+ const [reportSaving,setReportSaving]=useState(false);
+ const [reportForm,setReportForm]=useState({reason:"harassment",details:""});
  const [reviewForm,setReviewForm]=useState({
   overall_rating:5,
   teaching_quality:5,
@@ -259,6 +269,11 @@ export default function App(){
      const ids=new Set(data.message_ids||[]);
      setChatMessages(prev=>prev.map(m=>ids.has(m.id)?{...m,read_at:data.read_at}:m));
      loadConversations();
+    }else if(data.event==="blocked"){
+     setNotice(data.detail||"This chat is no longer available.");
+     setChatOpen(false);
+     setActiveConversation(null);
+     setChatMessages([]);
     }
    };
    socket.onclose=()=>{
@@ -410,6 +425,106 @@ export default function App(){
     if(!searched) setMatches(normalized);
    }
   }catch{}
+ }
+
+ async function loadSafetyCenter(){
+  if(!user) return;
+  setSafetyLoading(true);
+  try{
+   const res=await api("/auth/safety/");
+   if(res.ok) setSafetyData(await res.json());
+   if(user.is_staff){
+    setModerationLoading(true);
+    const modRes=await api("/auth/safety/moderation/");
+    if(modRes.ok) setModerationQueue(await modRes.json());
+    setModerationLoading(false);
+   }
+  }finally{
+   setSafetyLoading(false);
+  }
+ }
+
+ async function openSafetyCenter(){
+  setSafetyOpen(true);
+  await loadSafetyCenter();
+ }
+
+ function openReport(target){
+  if(!user){setAuthMode("login");setAuthOpen(true);return;}
+  setReportTarget(target);
+  setReportForm({reason:"harassment",details:""});
+ }
+
+ async function submitSafetyReport(e){
+  e.preventDefault();
+  if(!reportTarget) return;
+  setReportSaving(true);
+  try{
+   const res=await api("/auth/safety/reports/",{
+    method:"POST",
+    body:JSON.stringify({
+     target_type:reportTarget.target_type,
+     target_id:reportTarget.target_id||null,
+     reported_user:reportTarget.reported_user||null,
+     reason:reportForm.reason,
+     details:reportForm.details
+    })
+   });
+   const data=await res.json().catch(()=>({}));
+   if(!res.ok){setNotice(data.detail||"Could not submit report.");return;}
+   setReportTarget(null);
+   setNotice("Report submitted to SkillSwap Safety 🛡");
+   if(safetyOpen) await loadSafetyCenter();
+  }finally{setReportSaving(false);}
+ }
+
+ async function blockUser(userId){
+  if(!userId||userId===user?.id) return;
+  const res=await api("/auth/safety/block/"+userId+"/",{method:"POST"});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){setNotice(data.detail||"Could not block this user.");return;}
+  setPassportOpen(false);setPassport(null);
+  setMatches(prev=>prev.filter(item=>item.user_id!==userId));
+  setCommunityUsers(prev=>prev.filter(item=>item.user_id!==userId));
+  setConversations(prev=>prev.filter(item=>item.partner_id!==userId));
+  if(activeConversation?.partner_id===userId){setChatOpen(false);setActiveConversation(null);setChatMessages([]);}
+  setNotice("User blocked. They can no longer directly interact with you.");
+  await loadSafetyCenter();
+ }
+
+ async function unblockUser(userId){
+  const res=await api("/auth/safety/block/"+userId+"/",{method:"DELETE"});
+  if(res.ok){
+   setNotice("User unblocked.");
+   await loadSafetyCenter();
+   await loadCommunityUsers();
+  }
+ }
+
+ async function moderateReport(id,action){
+  const payload=action==="restrict"?{days:7}:{};
+  const res=await api("/auth/safety/moderation/"+id+"/"+action+"/",{method:"POST",body:JSON.stringify(payload)});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){setNotice(data.detail||"Could not update report.");return;}
+  setModerationQueue(prev=>prev.map(item=>item.id===data.id?data:item));
+  setNotice("Moderation action applied.");
+ }
+
+ async function moderateCircleMember(circleId,userId,action){
+  const res=await api("/circles/"+circleId+"/members/"+userId+"/"+action+"/",{method:"POST"});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){setNotice(data.detail||"Could not moderate member.");return;}
+  setActiveCircle(data);
+  setCircles(prev=>prev.map(item=>item.id===data.id?data:item));
+  setNotice("Circle moderation updated.");
+ }
+
+ async function deleteCircleMessage(circleId,messageId){
+  const res=await api("/circles/"+circleId+"/messages/"+messageId+"/",{method:"DELETE"});
+  if(res.ok){
+   setCircleMessages(prev=>prev.filter(item=>item.id!==messageId));
+   setNotice("Circle message removed.");
+  }
  }
 
  async function runUniversalSearch(query=""){
@@ -1394,6 +1509,7 @@ export default function App(){
   setRescheduleOpen(false); setRescheduleBooking(null); setRescheduleSuggestions([]);
   setCalendarOpen(false); setCalendarEvents([]);
   setUniversalSearchOpen(false); setUniversalSearchQuery(""); setUniversalSearchData({people:[],skills:[],circles:[],mentors:[],counts:{}});
+  setSafetyOpen(false); setSafetyData(null); setModerationQueue([]); setReportTarget(null);
   setSearched(false); setMatches(communityUsers.map(person=>({...person,score:null,confidence:"",breakdown:{},reasons:[],missing:[],suggested_times:[]})));
  }
 
@@ -1621,6 +1737,10 @@ export default function App(){
         <button disabled={passportLoading} onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openPassport(user.id);}}>
          <span className="nav-menu-icon">🛂</span>
          <span><b>Skill Passport</b><small>Your learning identity</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openSafetyCenter();}}>
+         <span className="nav-menu-icon">🛡</span>
+         <span><b>Safety Center</b><small>Blocks, reports and account standing</small></span>
         </button>
         <button className="nav-logout-item" onClick={logout}>
          <span className="nav-menu-icon">↪</span>
@@ -1972,6 +2092,9 @@ export default function App(){
     onScheduleSession={scheduleCircleSession}
     onGenerateAIPlan={generateCircleAIPlan}
     onPassport={openPassport}
+    onModerateMember={moderateCircleMember}
+    onDeleteMessage={deleteCircleMessage}
+    onReport={openReport}
     focusCircleId={circleFocusId}
   />
 
@@ -2021,7 +2144,32 @@ export default function App(){
   <SkillPassport
     open={passportOpen}
     passport={passport}
+    currentUserId={user?.id}
+    onBlock={blockUser}
+    onReport={openReport}
     onClose={()=>{setPassportOpen(false);setPassport(null)}}
+  />
+
+  <SafetyCenter
+    open={safetyOpen}
+    data={safetyData}
+    loading={safetyLoading}
+    isStaff={!!user?.is_staff}
+    moderationQueue={moderationQueue}
+    moderationLoading={moderationLoading}
+    onClose={()=>setSafetyOpen(false)}
+    onUnblock={unblockUser}
+    onRefresh={loadSafetyCenter}
+    onModerationAction={moderateReport}
+  />
+
+  <ReportModal
+    target={reportTarget}
+    form={reportForm}
+    setForm={setReportForm}
+    onClose={()=>setReportTarget(null)}
+    onSubmit={submitSafetyReport}
+    saving={reportSaving}
   />
 
   <ReviewModal
@@ -2085,6 +2233,7 @@ export default function App(){
     partnerTyping={chatPartnerTyping}
     partnerOnline={chatPartnerOnline}
     partnerLastSeen={chatPartnerLastSeen}
+    onReport={openReport}
     sending={chatSending}
     booking={activeConversation ? bookings.find(b=>b.swap===activeConversation.swap && b.status==="scheduled") : null}
   />

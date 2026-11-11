@@ -8,6 +8,7 @@ from notifications.models import Notification
 from notifications.services import notify
 from swaps.models import Swap
 from circles.models import SkillCircle, CircleMember, CircleMessage
+from users.safety import interaction_block_reason, is_blocked_between
 
 
 @database_sync_to_async
@@ -27,6 +28,17 @@ def presence_disconnect(user):
         presence.last_seen = timezone.now()
     presence.save(update_fields=["connection_count", "last_seen"])
     return next_count, presence.last_seen.isoformat() if presence.last_seen else None
+
+
+@database_sync_to_async
+def can_view_presence(viewer, subject_id):
+    if viewer.id == subject_id:
+        return True
+    from django.contrib.auth import get_user_model
+    subject = get_user_model().objects.filter(pk=subject_id).first()
+    if not subject:
+        return False
+    return not is_blocked_between(viewer, subject)
 
 
 @database_sync_to_async
@@ -52,6 +64,9 @@ def get_swap_for_user(swap_id, user):
         return None
     if user not in {swap.requester, swap.recipient} or swap.status not in {"accepted", "completed"}:
         return None
+    partner = swap.recipient if swap.requester_id == user.id else swap.requester
+    if interaction_block_reason(user, partner):
+        return None
     return swap
 
 
@@ -60,6 +75,8 @@ def create_direct_message(swap_id, user, body):
     swap = Swap.objects.select_related("requester", "recipient").get(pk=swap_id)
     conversation, _ = Conversation.objects.get_or_create(swap=swap)
     recipient = swap.recipient if swap.requester_id == user.id else swap.requester
+    if interaction_block_reason(user, recipient):
+        return None, None
     recipient_presence = UserPresence.objects.filter(user=recipient).first()
     delivered_at = timezone.now() if recipient_presence and recipient_presence.connection_count > 0 else None
     message = Message.objects.create(
@@ -122,6 +139,9 @@ def get_circle_for_user(circle_id, user):
 @database_sync_to_async
 def create_circle_message(circle_id, user, body):
     circle = SkillCircle.objects.get(pk=circle_id)
+    membership = CircleMember.objects.filter(circle=circle, user=user).first()
+    if not membership or getattr(membership, "is_muted", False):
+        return None
     message = CircleMessage.objects.create(circle=circle, sender=user, body=body)
     profile = getattr(user, "profile", None)
     return {
@@ -181,7 +201,7 @@ class ActivityConsumer(AsyncJsonWebsocketConsumer):
         event = content.get("event")
         if event == "presence_query":
             user_id = int(content.get("user_id") or 0)
-            if user_id:
+            if user_id and await can_view_presence(self.user, user_id):
                 await self.send_json({
                     "event": "presence",
                     "presence": await presence_payload(user_id),
@@ -191,7 +211,9 @@ class ActivityConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json({"event": "notification", "notification": event["notification"]})
 
     async def presence_event(self, event):
-        await self.send_json({"event": "presence", "presence": event["presence"]})
+        subject_id = event["presence"]["user_id"]
+        if await can_view_presence(self.user, subject_id):
+            await self.send_json({"event": "presence", "presence": event["presence"]})
 
 
 class DirectChatConsumer(AsyncJsonWebsocketConsumer):
@@ -242,10 +264,13 @@ class DirectChatConsumer(AsyncJsonWebsocketConsumer):
             if not body or len(body) > 2000:
                 return
             message, _ = await create_direct_message(self.swap_id, self.user, body)
-            await self.channel_layer.group_send(
-                self.group_name,
-                {"type": "chat_message_event", "message": message},
-            )
+            if message:
+                await self.channel_layer.group_send(
+                    self.group_name,
+                    {"type": "chat_message_event", "message": message},
+                )
+            else:
+                await self.send_json({"event": "blocked", "detail": "This chat is no longer available."})
         elif event == "typing":
             await self.channel_layer.group_send(
                 self.group_name,
@@ -330,10 +355,11 @@ class CircleChatConsumer(AsyncJsonWebsocketConsumer):
             if not body or len(body) > 3000:
                 return
             message = await create_circle_message(self.circle_id, self.user, body)
-            await self.channel_layer.group_send(
-                self.group_name,
-                {"type": "circle_message_event", "message": message},
-            )
+            if message:
+                await self.channel_layer.group_send(
+                    self.group_name,
+                    {"type": "circle_message_event", "message": message},
+                )
         elif event == "typing":
             await self.channel_layer.group_send(
                 self.group_name,

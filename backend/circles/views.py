@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from notifications.models import Notification
 from notifications.services import notify
 from workspaces.ai_planner import generate_learning_plan
+from users.safety import interaction_block_reason
 
 from .models import SkillCircle, CircleMember, CircleMessage, CircleSession, CircleTask, CircleResource
 from .serializers import (
@@ -89,6 +90,9 @@ class CircleJoinView(APIView):
 
     def post(self, request, circle_id):
         circle = circle_for_user(request, circle_id)
+        safety_reason = interaction_block_reason(request.user, circle.created_by)
+        if safety_reason and circle.created_by_id != request.user.id:
+            return Response({"detail": "You cannot join this Circle right now."}, status=403)
         role = str(request.data.get("role", CircleMember.Role.LEARNER))
         if role not in {CircleMember.Role.MENTOR, CircleMember.Role.LEARNER}:
             role = CircleMember.Role.LEARNER
@@ -139,6 +143,9 @@ class CircleMessagesView(APIView):
         circle = circle_for_user(request, circle_id, require_member=True)
         if not circle:
             return Response({"detail": "Join this circle to chat."}, status=403)
+        membership = circle.memberships.filter(user=request.user).first()
+        if membership and membership.is_muted:
+            return Response({"detail": "A Circle mentor has muted your chat access."}, status=403)
         body = str(request.data.get("body", "")).strip()
         if not body:
             return Response({"detail": "Message cannot be empty."}, status=400)
@@ -247,3 +254,72 @@ class CircleAIPlanView(APIView):
         circle.save(update_fields=["ai_plan", "ai_plan_source", "ai_plan_updated_at", "updated_at"])
 
         return Response(SkillCircleSerializer(circle, context={"request": request}).data)
+
+
+
+class CircleMemberModerationView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, circle_id, user_id, action):
+        circle = circle_for_user(request, circle_id, require_member=True)
+        if not circle:
+            return Response({"detail": "Circle not found."}, status=404)
+        if not is_mentor(circle, request.user):
+            return Response({"detail": "Only Circle mentors can moderate members."}, status=403)
+
+        membership = get_object_or_404(CircleMember, circle=circle, user_id=user_id)
+        if membership.user_id == circle.created_by_id:
+            return Response({"detail": "The Circle creator cannot be moderated this way."}, status=400)
+        if membership.user_id == request.user.id and action in {"remove", "demote"}:
+            return Response({"detail": "You cannot apply that action to yourself."}, status=400)
+
+        if action == "mute":
+            membership.is_muted = True
+            membership.save(update_fields=["is_muted"])
+        elif action == "unmute":
+            membership.is_muted = False
+            membership.save(update_fields=["is_muted"])
+        elif action == "promote":
+            membership.role = CircleMember.Role.MENTOR
+            membership.save(update_fields=["role"])
+        elif action == "demote":
+            membership.role = CircleMember.Role.LEARNER
+            membership.save(update_fields=["role"])
+        elif action == "remove":
+            membership.delete()
+        else:
+            return Response({"detail": "Unknown moderation action."}, status=400)
+
+        notify(
+            membership.user,
+            Notification.Kind.SYSTEM,
+            f"Circle moderation update · {circle.title}",
+            {
+                "mute": "Your Circle chat access was muted.",
+                "unmute": "Your Circle chat access was restored.",
+                "promote": "You are now a Circle mentor.",
+                "demote": "Your Circle role is now learner.",
+                "remove": "You were removed from the Circle.",
+            }.get(action, "Your Circle membership changed."),
+            actor=request.user,
+            action_type="circle",
+            target_id=circle.id,
+            dedupe_key=f"circle-moderation:{circle.id}:{user_id}:{action}:{timezone.now().timestamp()}",
+        )
+
+        return Response(SkillCircleSerializer(circle, context={"request": request}).data)
+
+
+class CircleMessageModerationView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, circle_id, pk):
+        circle = circle_for_user(request, circle_id, require_member=True)
+        if not circle:
+            return Response({"detail": "Circle not found."}, status=404)
+        if not is_mentor(circle, request.user):
+            return Response({"detail": "Only Circle mentors can remove messages."}, status=403)
+
+        message = get_object_or_404(CircleMessage, pk=pk, circle=circle)
+        message.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

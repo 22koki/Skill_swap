@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Profile, AvailabilitySlot
+from .models import Profile, AvailabilitySlot, UserBlock, SafetyReport, AccountStanding
 
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -18,7 +18,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "first_name", "last_name", "profile"]
+        fields = ["id", "username", "email", "first_name", "last_name", "is_staff", "profile"]
+        read_only_fields = ["id", "is_staff"]
 
     def update(self, instance, validated_data):
         profile_data = validated_data.pop("profile", {})
@@ -60,3 +61,66 @@ class AvailabilitySlotSerializer(serializers.ModelSerializer):
         if attrs["end_time"] <= attrs["start_time"]:
             raise serializers.ValidationError("End time must be after start time.")
         return attrs
+
+
+class UserBlockSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source="blocked.id", read_only=True)
+    username = serializers.CharField(source="blocked.username", read_only=True)
+    name = serializers.SerializerMethodField()
+    avatar_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserBlock
+        fields = ["id", "user_id", "username", "name", "avatar_url", "created_at"]
+
+    def get_name(self, obj):
+        return obj.blocked.get_full_name() or obj.blocked.username
+
+    def get_avatar_url(self, obj):
+        profile = getattr(obj.blocked, "profile", None)
+        return profile.avatar_url if profile else ""
+
+
+class AccountStandingSerializer(serializers.ModelSerializer):
+    restricted = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AccountStanding
+        fields = ["warning_count", "restricted_until", "restricted", "suspended", "note", "updated_at"]
+
+    def get_restricted(self, obj):
+        from django.utils import timezone
+        return bool(obj.restricted_until and obj.restricted_until > timezone.now())
+
+
+class SafetyReportSerializer(serializers.ModelSerializer):
+    reporter_name = serializers.SerializerMethodField()
+    reported_user_name = serializers.SerializerMethodField()
+    reviewed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SafetyReport
+        fields = [
+            "id", "reporter", "reporter_name", "reported_user", "reported_user_name",
+            "target_type", "target_id", "reason", "details", "evidence",
+            "status", "resolution_action", "resolution_note",
+            "reviewed_by", "reviewed_by_name", "reviewed_at", "created_at", "updated_at",
+        ]
+        read_only_fields = [
+            "id", "reporter", "reporter_name", "reported_user_name", "evidence",
+            "status", "resolution_action", "resolution_note",
+            "reviewed_by", "reviewed_by_name", "reviewed_at", "created_at", "updated_at",
+        ]
+
+    def get_reporter_name(self, obj):
+        return obj.reporter.get_full_name() or obj.reporter.username
+
+    def get_reported_user_name(self, obj):
+        if not obj.reported_user:
+            return ""
+        return obj.reported_user.get_full_name() or obj.reported_user.username
+
+    def get_reviewed_by_name(self, obj):
+        if not obj.reviewed_by:
+            return ""
+        return obj.reviewed_by.get_full_name() or obj.reviewed_by.username
