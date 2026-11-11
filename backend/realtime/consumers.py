@@ -231,14 +231,8 @@ class DirectChatConsumer(AsyncJsonWebsocketConsumer):
     async def disconnect(self, code):
         if not hasattr(self, "group_name"):
             return
-        await self.channel_layer.group_send(
-            self.group_name,
-            {
-                "type": "chat_presence_event",
-                "user_id": self.user.id,
-                "online": False,
-            },
-        )
+        # Global activity presence is authoritative. Closing only this chat
+        # must not make the user appear offline across SkillSwap.
         await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
     async def receive_json(self, content, **kwargs):
