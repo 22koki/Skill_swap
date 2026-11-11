@@ -7,6 +7,8 @@ from rest_framework.views import APIView
 from .models import Booking
 from .serializers import BookingSerializer
 from users.models import Profile
+from notifications.models import Notification
+from notifications.services import notify
 
 class BookingListCreateView(generics.ListCreateAPIView):
     serializer_class = BookingSerializer
@@ -18,6 +20,21 @@ class BookingListCreateView(generics.ListCreateAPIView):
         ).select_related(
             "swap", "swap__requester", "swap__recipient",
             "swap__offered_skill", "swap__requested_skill",
+        )
+
+    def perform_create(self, serializer):
+        booking = serializer.save()
+        partner = booking.swap.recipient if booking.swap.requester == self.request.user else booking.swap.requester
+        notify(
+            partner,
+            Notification.Kind.SESSION,
+            "A SkillSwap session was scheduled",
+            booking.starts_at.strftime("%a %d %b · %H:%M"),
+            actor=self.request.user,
+            action_type="booking",
+            target_id=booking.id,
+            dedupe_key=f"booking-created:{booking.id}",
+            metadata={"swap_id": booking.swap_id},
         )
 
 class BookingDetailView(generics.RetrieveUpdateAPIView):
@@ -46,6 +63,8 @@ class BookingActionView(APIView):
 
         if action == "cancel":
             booking.status = Booking.Status.CANCELLED
+            partner = booking.swap.recipient if booking.swap.requester == request.user else booking.swap.requester
+            notify(partner, Notification.Kind.SESSION, "A SkillSwap session was cancelled", "Open the swap to plan a new time.", actor=request.user, action_type="booking", target_id=booking.id, dedupe_key=f"booking-cancelled:{booking.id}")
         elif action == "complete":
             if booking.status != Booking.Status.COMPLETED:
                 booking.status = Booking.Status.COMPLETED
