@@ -65,6 +65,38 @@ export default function SkillCircles({
     return circles.filter(c=>c.circle_type===filter);
   },[circles,filter]);
 
+  const myCircles=useMemo(()=>circles.filter(item=>item.membership),[circles]);
+  const featuredCircle=useMemo(()=>{
+    return filtered.find(item=>item.membership) || filtered[0] || circles[0] || null;
+  },[filtered,circles]);
+  const discoverCircles=useMemo(()=>{
+    if(!featuredCircle) return filtered;
+    return filtered.filter(item=>item.id!==featuredCircle.id);
+  },[filtered,featuredCircle]);
+  const communityStats=useMemo(()=>{
+    const uniqueMembers=new Set();
+    const uniqueMentors=new Map();
+    const upcoming=[];
+    circles.forEach(item=>{
+      (item.members||[]).forEach(member=>{
+        uniqueMembers.add(member.user_id);
+        if(member.role==="mentor") uniqueMentors.set(member.user_id,member);
+      });
+      (item.sessions||[]).forEach(session=>{
+        if(new Date(session.starts_at).getTime()>=Date.now()){
+          upcoming.push({...session,circleTitle:item.title,circleEmoji:item.cover_emoji});
+        }
+      });
+    });
+    upcoming.sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));
+    return {
+      circles:circles.length,
+      members:uniqueMembers.size,
+      mentors:Array.from(uniqueMentors.values()),
+      sessions:upcoming.slice(0,3),
+    };
+  },[circles]);
+
   if(!open) return null;
 
   const circle=activeCircle;
@@ -87,100 +119,224 @@ export default function SkillCircles({
   return (
     <div className="circles-backdrop" onMouseDown={onClose}>
       <section className="circles-shell" onMouseDown={e=>e.stopPropagation()}>
-        <header className="circles-header">
-          <div>
+        <header className={"circles-header "+(view==="browse"?"circles-header-showcase":"")}>
+          <div className="circles-header-copy">
             <div className="circles-kicker">LEARN TOGETHER</div>
             <h2>Skill Circles</h2>
             <p>Small group spaces for shared goals, group sessions, challenges and peer learning.</p>
           </div>
+
+          {view==="browse"&&<div className="circles-header-art" aria-hidden="true">
+            <span className="circle-float-icon camera">📷</span>
+            <span className="circle-float-icon code">{"</>"}</span>
+            <span className="circle-float-icon creative">🖌️</span>
+            <i className="circle-orbit orbit-one"></i>
+            <i className="circle-orbit orbit-two"></i>
+          </div>}
+
           <div className="circles-header-actions">
             {view==="workspace"&&<button className="outline" onClick={()=>setView("browse")}>← All circles</button>}
-            {user&&view==="browse"&&<button className="primary" onClick={()=>setCreateOpen(true)}>+ Create circle</button>}
+            {user&&view==="browse"&&<button className="primary circles-create-main" onClick={()=>setCreateOpen(true)}>+ Create circle</button>}
             <button className="circles-close" onClick={onClose}>×</button>
           </div>
         </header>
 
         {view==="browse" ? (
-          <>
-            <div className="circles-toolbar">
+          <div className="circles-browse">
+            <div className="circles-toolbar circles-toolbar-premium">
               <div className="circles-filters">
                 {[
-                  ["all","All"],
-                  ["mine","My circles"],
-                  ["learn","Learn"],
-                  ["project","Projects"],
-                  ["career","Career"],
-                  ["creative","Creative"],
-                  ["study","Study"],
-                ].map(([key,label])=>(
-                  <button key={key} className={filter===key?"active":""} onClick={()=>setFilter(key)}>{label}</button>
+                  ["all","▦","All"],
+                  ["mine","♙","My circles"],
+                  ["learn","▣","Learn"],
+                  ["project","◆","Projects"],
+                  ["career","▤","Career"],
+                  ["creative","✦","Creative"],
+                  ["study","◇","Study"],
+                ].map(([key,icon,label])=>(
+                  <button key={key} className={filter===key?"active":""} onClick={()=>setFilter(key)}>
+                    <span>{icon}</span>{label}
+                  </button>
                 ))}
               </div>
               <div className="circles-count">{filtered.length} circle{filtered.length===1?"":"s"}</div>
             </div>
 
-            <div className="circles-grid">
-              {loading ? <div className="circles-empty">Loading circles…</div> :
-               filtered.length ? filtered.map(item=>{
-                const meta=TYPE_META[item.circle_type]||TYPE_META.learn;
-                const visual=getSkillVisual(item.primary_skill_name||item.title);
-                return (
-                  <article className="circle-card" key={item.id}>
-                    <div className="circle-card-aura"></div>
-                    <div className="circle-card-top">
-                      <div className={"circle-card-icon "+visual.className}>{item.cover_emoji||visual.icon||meta[0]}</div>
-                      <span className="circle-type-pill">{meta[0]} {meta[1]}</span>
+            {loading ? <div className="circles-empty">Loading circles…</div> : featuredCircle ? (
+              <div className="circles-dashboard">
+                <main className="circles-dashboard-main">
+                  {(()=>{
+                    const item=featuredCircle;
+                    const meta=TYPE_META[item.circle_type]||TYPE_META.learn;
+                    const visual=getSkillVisual(item.primary_skill_name||item.title);
+                    return <article className={"circle-featured circle-theme-"+item.circle_type}>
+                      <div className="circle-featured-bg">
+                        <span className="circle-featured-orb orb-a"></span>
+                        <span className="circle-featured-orb orb-b"></span>
+                        <span className="circle-featured-grid"></span>
+                      </div>
+
+                      <div className="circle-featured-content">
+                        <div className="circle-featured-label">
+                          <span>✦</span> FEATURED CIRCLE
+                        </div>
+                        <h3>{item.title}</h3>
+                        <p>{item.description||item.goal||"Learn, build and grow together with the SkillSwap community."}</p>
+
+                        <div className="circle-featured-members">
+                          <div className="circle-avatars featured">
+                            {(item.members||[]).slice(0,5).map(member=>(
+                              <button key={member.id} onClick={()=>onPassport(member.user_id)} title={member.name}>
+                                {member.avatar_url?<img src={member.avatar_url} alt=""/>:<span>{initials(member.name)}</span>}
+                              </button>
+                            ))}
+                          </div>
+                          <div>
+                            <b>{item.member_count} member{item.member_count===1?"":"s"}</b>
+                            <span>{item.mentor_count} mentor{item.mentor_count===1?"":"s"} · {item.learner_count} learner{item.learner_count===1?"":"s"}</span>
+                          </div>
+                        </div>
+
+                        <div className="circle-featured-metrics">
+                          <div><span>{visual.icon}</span><small>FOCUS SKILL</small><b>{item.primary_skill_name||"Multi-skill"}</b></div>
+                          <div><span>👥</span><small>COMMUNITY</small><b>{meta[1]}</b></div>
+                          <div><span>📅</span><small>NEXT SESSION</small><b>{item.next_session?fmt(item.next_session.starts_at):"Plan together"}</b></div>
+                        </div>
+
+                        <div className="circle-featured-progress">
+                          <div><span>Group progress</span><b>{item.progress_percentage||0}%</b></div>
+                          <div className="circle-progress-track"><i style={{width:(item.progress_percentage||0)+"%"}}></i></div>
+                        </div>
+
+                        <div className="circle-featured-actions">
+                          <button className="circle-featured-open" onClick={async()=>{await onOpenCircle(item.id);setView("workspace");}}>Open circle <span>→</span></button>
+                          {item.membership
+                            ? <span className={"circle-featured-role "+item.membership.role}>{item.membership.role==="mentor"?"🎓 Mentor":"🌱 Learner"}</span>
+                            : user&&<button className="circle-featured-join" onClick={()=>onJoin(item.id,"learner")}>Join circle</button>}
+                        </div>
+                      </div>
+
+                      <div className="circle-featured-visual">
+                        <div className={"circle-featured-icon "+visual.className}>
+                          <span>{visual.icon}</span>
+                        </div>
+                        <div className="circle-featured-chip chip-one">✦ Learn</div>
+                        <div className="circle-featured-chip chip-two">↗ Build</div>
+                        <div className="circle-featured-chip chip-three">👥 Grow</div>
+                      </div>
+                    </article>;
+                  })()}
+
+                  <section className="circles-discover-section">
+                    <div className="circles-section-head">
+                      <div>
+                        <div className="circles-section-icon">◈</div>
+                        <div><h3>Discover circles</h3><p>Explore active communities, meet peers and start learning together.</p></div>
+                      </div>
+                      {discoverCircles.length>0&&<span>{discoverCircles.length} more</span>}
                     </div>
 
-                    <h3>{item.title}</h3>
-                    <p>{item.description||item.goal||"A SkillSwap group learning space."}</p>
+                    <div className="circles-discover-grid">
+                      {(discoverCircles.length?discoverCircles:filtered.slice(0,3)).map(item=>{
+                        const meta=TYPE_META[item.circle_type]||TYPE_META.learn;
+                        const visual=getSkillVisual(item.primary_skill_name||item.title);
+                        return <article className={"circle-discover-card circle-theme-"+item.circle_type} key={"discover-"+item.id}>
+                          <div className="circle-discover-cover">
+                            <div className={"circle-discover-icon "+visual.className}>{visual.icon}</div>
+                            <span>{meta[0]} {meta[1]}</span>
+                          </div>
+                          <div className="circle-discover-body">
+                            <h4>{item.title}</h4>
+                            <p>{item.description||item.goal||"A focused SkillSwap learning community."}</p>
+                            <div className="circle-discover-members">
+                              <div className="circle-avatars compact">
+                                {(item.members||[]).slice(0,4).map(member=>(
+                                  <button key={member.id} onClick={()=>onPassport(member.user_id)}>
+                                    {member.avatar_url?<img src={member.avatar_url} alt=""/>:<span>{initials(member.name)}</span>}
+                                  </button>
+                                ))}
+                              </div>
+                              <b>{item.member_count} members</b>
+                            </div>
+                            <div className="circle-progress-row">
+                              <div><span>Group progress</span><b>{item.progress_percentage||0}%</b></div>
+                              <div className="circle-progress-track"><i style={{width:(item.progress_percentage||0)+"%"}}></i></div>
+                            </div>
+                            <div className="circle-discover-actions">
+                              <button className="primary" onClick={async()=>{await onOpenCircle(item.id);setView("workspace");}}>Open circle →</button>
+                              {!item.membership&&user&&<button className="circle-mini-join" onClick={()=>onJoin(item.id,"learner")}>＋</button>}
+                            </div>
+                          </div>
+                        </article>;
+                      })}
+                    </div>
+                  </section>
+                </main>
 
-                    <div className="circle-card-skill">
-                      <span>{visual.icon}</span>
-                      <div><small>FOCUS SKILL</small><b>{item.primary_skill_name||"Multi-skill circle"}</b></div>
+                <aside className="circles-dashboard-side">
+                  <section className="circles-side-card circles-your-card">
+                    <div className="circles-side-head">
+                      <div><span>👥</span><h3>Your circles</h3></div>
+                      <small>{myCircles.length}</small>
+                    </div>
+                    <div className="circles-your-list">
+                      {myCircles.length ? myCircles.slice(0,4).map(item=>{
+                        const visual=getSkillVisual(item.primary_skill_name||item.title);
+                        return <button key={item.id} onClick={async()=>{await onOpenCircle(item.id);setView("workspace");}}>
+                          <div className={"circles-your-icon "+visual.className}>{visual.icon}</div>
+                          <div className="circles-your-copy">
+                            <b>{item.title}</b>
+                            <div className="circles-your-progress"><i style={{width:(item.progress_percentage||0)+"%"}}></i></div>
+                          </div>
+                          <span>{item.progress_percentage||0}%</span>
+                          <em className={item.membership.role}>{item.membership.role==="mentor"?"🎓 Mentor":"🌱 Learner"}</em>
+                        </button>;
+                      }) : <div className="circle-side-empty">Join a circle and it will appear here.</div>}
+                    </div>
+                  </section>
+
+                  <section className="circles-side-card circles-pulse-card">
+                    <div className="circles-side-head">
+                      <div><span>〽</span><h3>Community Pulse</h3></div>
+                    </div>
+                    <p className="circles-side-sub">What's happening across your Skill Circles.</p>
+
+                    <div className="circles-pulse-stats">
+                      <div><span>◉</span><strong>{communityStats.members}</strong><small>people</small></div>
+                      <div><span>🎓</span><strong>{communityStats.mentors.length}</strong><small>mentors</small></div>
+                      <div><span>◫</span><strong>{communityStats.circles}</strong><small>circles</small></div>
                     </div>
 
-                    <div className="circle-member-stack">
-                      <div className="circle-avatars">
-                        {(item.members||[]).slice(0,5).map(member=>(
-                          <button key={member.id} onClick={()=>onPassport(member.user_id)} title={member.name}>
+                    <div className="circles-pulse-block">
+                      <div className="circles-pulse-title"><b>Mentors</b><span>{communityStats.mentors.length}</span></div>
+                      <div className="circles-mentor-row">
+                        {communityStats.mentors.slice(0,6).map(member=>(
+                          <button key={member.user_id} onClick={()=>onPassport(member.user_id)} title={member.name}>
                             {member.avatar_url?<img src={member.avatar_url} alt=""/>:<span>{initials(member.name)}</span>}
                           </button>
                         ))}
-                        {item.member_count>5&&<i>+{item.member_count-5}</i>}
-                      </div>
-                      <div className="circle-member-copy">
-                        <b>{item.member_count} member{item.member_count===1?"":"s"}</b>
-                        <span>{item.mentor_count} mentors · {item.learner_count} learners</span>
+                        {!communityStats.mentors.length&&<small>No mentors yet</small>}
                       </div>
                     </div>
 
-                    <div className="circle-progress-row">
-                      <div>
-                        <span>Group progress</span><b>{item.progress_percentage||0}%</b>
+                    <div className="circles-pulse-block">
+                      <div className="circles-pulse-title"><b>Upcoming sessions</b><span>{communityStats.sessions.length}</span></div>
+                      <div className="circles-upcoming-list">
+                        {communityStats.sessions.length ? communityStats.sessions.map((session,index)=>(
+                          <article key={session.id||index}>
+                            <span>📅</span>
+                            <div><b>{session.circleTitle}</b><small>{fmt(session.starts_at)}</small></div>
+                          </article>
+                        )) : <div className="circle-side-empty compact">No sessions scheduled yet.</div>}
                       </div>
-                      <div className="circle-progress-track"><i style={{width:(item.progress_percentage||0)+"%"}}></i></div>
                     </div>
-
-                    {item.next_session&&(
-                      <div className="circle-next-session">
-                        <span>📅</span>
-                        <div><small>NEXT SESSION</small><b>{fmt(item.next_session.starts_at)}</b></div>
-                      </div>
-                    )}
-
-                    <div className="circle-card-actions">
-                      <button className="outline" onClick={async()=>{await onOpenCircle(item.id);setView("workspace");}}>Open circle</button>
-                      {!item.membership&&user&&<button className="primary" onClick={()=>onJoin(item.id,"learner")}>Join →</button>}
-                      {item.membership&&<span className={"circle-role "+item.membership.role}>{item.membership.role==="mentor"?"🎓 Mentor":"🌱 Learner"}</span>}
-                    </div>
-                  </article>
-                );
-               }) : <div className="circles-empty">
-                 <div>👥</div><h3>No circles here yet</h3><p>Create the first group around a skill you care about.</p>
-               </div>}
-            </div>
-          </>
+                  </section>
+                </aside>
+              </div>
+            ) : <div className="circles-empty">
+              <div>👥</div><h3>No circles here yet</h3><p>Create the first group around a skill you care about.</p>
+            </div>}
+          </div>
         ) : circle ? (
           <div className="circle-workspace">
             <section className="circle-workspace-hero">
