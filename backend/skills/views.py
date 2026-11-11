@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from users.models import Profile
 from users.matching import build_match_data
+from users.safety import hidden_user_ids
 from .models import Skill, SkillCategory, UserSkill
 from .serializers import SkillSerializer, SkillCategorySerializer, UserSkillSerializer
 
@@ -50,8 +51,9 @@ class MatchListView(APIView):
         if not mine.exists():
             return Response([])
 
+        hidden_ids = hidden_user_ids(request.user)
         results = []
-        for user in User.objects.exclude(pk=request.user.pk):
+        for user in User.objects.exclude(pk=request.user.pk).exclude(pk__in=hidden_ids):
             match = build_match_data(request.user, user)
             if match["score"] <= 0 and not match["they_teach_me"] and not match["i_teach_them"]:
                 continue
