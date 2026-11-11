@@ -46,10 +46,12 @@ class SessionWorkspaceSerializer(serializers.ModelSerializer):
         fields = [
             "id", "booking", "booking_status", "swap_id", "partner_name",
             "learn_skill_name", "teach_skill_name", "goals", "lesson_plan",
-            "shared_notes", "progress_percentage", "resources", "checklist",
+            "shared_notes", "progress_percentage", "ai_plan", "ai_plan_source", "ai_goal",
+            "ai_learner_level", "ai_learning_style", "ai_session_count", "ai_plan_updated_at",
+            "resources", "checklist",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["booking", "created_at", "updated_at"]
+        read_only_fields = ["booking", "ai_plan_source", "ai_plan_updated_at", "created_at", "updated_at"]
 
     def _request_user(self):
         request = self.context.get("request")
