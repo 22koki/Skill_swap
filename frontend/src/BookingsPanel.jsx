@@ -7,9 +7,10 @@ function formatDate(value){
   }).format(new Date(value));
 }
 
-export default function BookingsPanel({ bookings, currentUser, onAction, onMessage, onWorkspace }) {
+export default function BookingsPanel({ bookings, currentUser, onAction, onMessage, onWorkspace, onReview }) {
   const upcoming=bookings.filter(b=>b.status==="scheduled");
-  if(!upcoming.length) return null;
+  const completed=bookings.filter(b=>b.status==="completed");
+  if(!upcoming.length && !completed.length) return null;
 
   const meName=currentUser
     ? ((currentUser.first_name||currentUser.username)+(currentUser.last_name?" "+currentUser.last_name:""))
@@ -28,7 +29,7 @@ export default function BookingsPanel({ bookings, currentUser, onAction, onMessa
         <div className="booking-count glass">{upcoming.length}<span>scheduled</span></div>
       </div>
 
-      <div className="booking-grid">
+      {!!upcoming.length && <div className="booking-grid">
         {upcoming.map(booking=>{
           const learn=getSkillVisual(booking.learn_skill_name);
           const teach=getSkillVisual(booking.teach_skill_name);
@@ -140,7 +141,50 @@ export default function BookingsPanel({ bookings, currentUser, onAction, onMessa
             </article>
           );
         })}
-      </div>
+      </div>}
+
+      {!!completed.length && <div className="completed-bookings">
+        <div className="completed-bookings-head">
+          <div>
+            <div className="eyebrow">RECENTLY COMPLETED</div>
+            <h3>Past SkillSwaps</h3>
+          </div>
+          <span>{completed.length} completed</span>
+        </div>
+
+        <div className="completed-booking-list">
+          {completed.map(booking=>{
+            const learn=getSkillVisual(booking.learn_skill_name);
+            const teach=getSkillVisual(booking.teach_skill_name);
+            return (
+              <article className="completed-booking-card glass" key={booking.id}>
+                <div className="completed-booking-main">
+                  <div className="completed-partner-avatar">
+                    {booking.partner_profile?.avatar_url
+                      ? <img src={booking.partner_profile.avatar_url} alt="" />
+                      : <span>{(booking.partner_name||"SS").split(" ").map(x=>x[0]).join("").slice(0,2).toUpperCase()}</span>}
+                  </div>
+                  <div>
+                    <small>With {booking.partner_name}</small>
+                    <h4>{booking.learn_skill_name} ↔ {booking.teach_skill_name}</h4>
+                    <div className="completed-skill-pills">
+                      <span className={learn.className}>{learn.icon} {booking.learn_skill_name}</span>
+                      <span className={teach.className}>{teach.icon} {booking.teach_skill_name}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="completed-booking-actions">
+                  {booking.review_status?.reviewed
+                    ? <span className="reviewed-chip">✓ Reviewed</span>
+                    : <button className="primary review-now-button" onClick={()=>onReview(booking)}>⭐ Leave review</button>}
+                  <button className="outline" onClick={()=>onMessage(booking.swap)}>💬 Message</button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </div>}
     </section>
   );
 }
