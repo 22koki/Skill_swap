@@ -34,6 +34,9 @@ export default function SkillCircles({
   onJoin,
   onLeave,
   onSendMessage,
+  onTyping,
+  onlineMemberIds=[],
+  typingUsers=[],
   onAddTask,
   onToggleTask,
   onAddResource,
@@ -357,6 +360,7 @@ export default function SkillCircles({
                   <span>🎓 {circle.mentor_count} mentors</span>
                   <span>🌱 {circle.learner_count} learners</span>
                   <span>📈 {circle.progress_percentage}% progress</span>
+                  {isMember&&<span className="circle-live-count">● {onlineMemberIds.length} online</span>}
                 </div>
               </div>
               <div className="circle-workspace-actions">
@@ -443,6 +447,7 @@ export default function SkillCircles({
                       <button key={member.id} onClick={()=>onPassport(member.user_id)}>
                         {member.avatar_url?<img src={member.avatar_url} alt=""/>:<span>{initials(member.name)}</span>}
                         <div><b>{member.name}</b><small>@{member.username}</small></div>
+                        <span className={"circle-member-presence "+(onlineMemberIds.includes(member.user_id)?"online":"")}></span>
                         <em className={member.role}>{member.role}</em>
                       </button>
                     ))}
@@ -475,10 +480,14 @@ export default function SkillCircles({
                         <b>{msg.sender_name}</b><p>{msg.body}</p><small>{fmt(msg.created_at)}</small>
                       </div>
                     )) : <div className="circle-inline-empty">Join the circle to view the group chat.</div>}
+                    {isMember&&typingUsers.length>0&&<div className="circle-typing-indicator">
+                      <span>•••</span>
+                      <b>{typingUsers.slice(0,2).map(item=>item.name).join(", ")} {typingUsers.length===1?"is":"are"} typing…</b>
+                    </div>}
                   </div>
                   {isMember&&<div className="circle-compose-inline">
-                    <input value={message} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&message.trim()){onSendMessage(circle.id,message);setMessage("");}}} placeholder="Message the circle…"/>
-                    <button className="primary" onClick={()=>{if(message.trim()){onSendMessage(circle.id,message);setMessage("");}}}>Send</button>
+                    <input value={message} onChange={e=>{setMessage(e.target.value);onTyping?.(!!e.target.value.trim());}} onKeyDown={e=>{if(e.key==="Enter"&&message.trim()){onTyping?.(false);onSendMessage(circle.id,message);setMessage("");}}} placeholder="Message the circle…"/>
+                    <button className="primary" onClick={()=>{if(message.trim()){onTyping?.(false);onSendMessage(circle.id,message);setMessage("");}}}>Send</button>
                   </div>}
                 </section>
               </aside>
