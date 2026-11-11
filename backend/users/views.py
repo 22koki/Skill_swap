@@ -850,3 +850,193 @@ class ModerationReportActionView(APIView):
 
         report.save()
         return Response(SafetyReportSerializer(report).data)
+
+
+
+class HomeDashboardView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from datetime import timedelta
+
+        from django.contrib.auth.models import User
+        from django.db.models import Q
+        from django.utils import timezone
+
+        from bookings.models import Booking
+        from bookings.serializers import BookingSerializer
+        from circles.models import CircleMember
+        from messaging.models import Conversation
+        from messaging.serializers import ConversationSerializer
+        from reviews.models import Review
+        from skills.models import UserSkill
+        from swaps.models import Swap
+        from swaps.serializers import SwapSerializer
+
+        user = request.user
+        now = timezone.now()
+        hidden_ids = hidden_user_ids(user)
+        progression = build_progression(user)
+
+        next_booking = (
+            Booking.objects.filter(
+                Q(swap__requester=user) | Q(swap__recipient=user),
+                status=Booking.Status.SCHEDULED,
+                starts_at__gte=now,
+            )
+            .exclude(
+                Q(swap__requester_id__in=hidden_ids) | Q(swap__recipient_id__in=hidden_ids)
+            )
+            .select_related(
+                "swap", "swap__requester", "swap__recipient",
+                "swap__offered_skill", "swap__requested_skill",
+            )
+            .prefetch_related("reviews", "reschedule_requests")
+            .order_by("starts_at")
+            .first()
+        )
+
+        pending_qs = (
+            Swap.objects.filter(recipient=user, status=Swap.Status.PROPOSED)
+            .exclude(requester_id__in=hidden_ids)
+            .select_related("requester", "recipient", "offered_skill", "requested_skill")
+            .order_by("-created_at")
+        )
+        pending_count = pending_qs.count()
+        pending_requests = SwapSerializer(
+            pending_qs[:3], many=True, context={"request": request}
+        ).data
+
+        conversations_qs = (
+            Conversation.objects.filter(
+                Q(swap__requester=user) | Q(swap__recipient=user)
+            )
+            .exclude(
+                Q(swap__requester_id__in=hidden_ids) | Q(swap__recipient_id__in=hidden_ids)
+            )
+            .select_related(
+                "swap", "swap__requester", "swap__recipient",
+                "swap__requester__profile", "swap__recipient__profile",
+                "swap__offered_skill", "swap__requested_skill",
+            )
+            .prefetch_related("messages")
+            .order_by("-updated_at")
+        )
+        conversation_payload = ConversationSerializer(
+            conversations_qs[:4], many=True, context={"request": request}
+        ).data
+        unread_messages = sum(
+            conversation.messages.exclude(sender=user).filter(read_at__isnull=True).count()
+            for conversation in conversations_qs
+        )
+
+        recommendations = []
+        if UserSkill.objects.filter(user=user).exists():
+            candidates = User.objects.exclude(pk=user.pk).exclude(pk__in=hidden_ids).select_related("profile")
+            for candidate in candidates:
+                match = build_match_data(user, candidate)
+                if match["score"] <= 0 and not match["they_teach_me"] and not match["i_teach_them"]:
+                    continue
+                profile, _ = Profile.objects.get_or_create(user=candidate)
+                recommendations.append({
+                    "user_id": candidate.id,
+                    "name": candidate.get_full_name() or candidate.username,
+                    "username": candidate.username,
+                    "avatar_url": profile.avatar_url,
+                    "location": profile.location,
+                    "average_rating": float(profile.average_rating),
+                    "completed_swaps": profile.completed_swaps,
+                    "score": match["score"],
+                    "confidence": match["confidence"],
+                    "reasons": match["reasons"][:2],
+                    "they_teach_me": match["they_teach_me"],
+                    "i_teach_them": match["i_teach_them"],
+                })
+            recommendations.sort(
+                key=lambda item: (-item["score"], -item["average_rating"], -item["completed_swaps"])
+            )
+            recommendations = recommendations[:3]
+
+        circle_memberships = (
+            CircleMember.objects.filter(user=user)
+            .select_related("circle", "circle__primary_skill")
+            .order_by("-circle__updated_at")
+        )
+        circle_activity = []
+        for membership in circle_memberships[:4]:
+            circle = membership.circle
+            latest_message = (
+                circle.messages.select_related("sender").order_by("-created_at").first()
+            )
+            next_session = (
+                circle.sessions.filter(starts_at__gte=now).order_by("starts_at").first()
+            )
+            circle_activity.append({
+                "id": circle.id,
+                "title": circle.title,
+                "cover_emoji": circle.cover_emoji,
+                "role": membership.role,
+                "primary_skill_name": circle.primary_skill.name if circle.primary_skill else "",
+                "member_count": circle.memberships.count(),
+                "latest_message": {
+                    "sender_name": latest_message.sender.get_full_name() or latest_message.sender.username,
+                    "body": latest_message.body[:120],
+                    "created_at": latest_message.created_at,
+                } if latest_message else None,
+                "next_session": {
+                    "id": next_session.id,
+                    "title": next_session.title,
+                    "starts_at": next_session.starts_at,
+                } if next_session else None,
+            })
+
+        local_now = timezone.localtime(now)
+        week_start_date = local_now.date() - timedelta(days=local_now.weekday())
+        week_start = timezone.make_aware(
+            timezone.datetime.combine(week_start_date, timezone.datetime.min.time()),
+            timezone.get_current_timezone(),
+        )
+        weekly_completed = Booking.objects.filter(
+            Q(swap__requester=user) | Q(swap__recipient=user),
+            status=Booking.Status.COMPLETED,
+            starts_at__gte=week_start,
+        ).count()
+        weekly_reviews_received = Review.objects.filter(
+            reviewee=user, created_at__gte=week_start
+        ).count()
+        weekly_reviews_written = Review.objects.filter(
+            reviewer=user, created_at__gte=week_start
+        ).count()
+        weekly_xp = (
+            weekly_completed * 80
+            + weekly_reviews_received * 20
+            + weekly_reviews_written * 15
+        )
+
+        upcoming_count = Booking.objects.filter(
+            Q(swap__requester=user) | Q(swap__recipient=user),
+            status=Booking.Status.SCHEDULED,
+            starts_at__gte=now,
+        ).count()
+
+        return Response({
+            "generated_at": now,
+            "summary": {
+                "pending_requests": pending_count,
+                "unread_messages": unread_messages,
+                "upcoming_sessions": upcoming_count,
+                "circle_count": circle_memberships.count(),
+                "weekly_xp": weekly_xp,
+            },
+            "progression": progression,
+            "next_session": (
+                BookingSerializer(next_booking, context={"request": request}).data
+                if next_booking else None
+            ),
+            "pending_requests": pending_requests,
+            "conversations": conversation_payload,
+            "recommendations": recommendations,
+            "circle_activity": circle_activity,
+            "recent_achievements": progression["unlocked"][-3:][::-1],
+            "next_achievements": progression["next_achievements"][:3],
+        })
