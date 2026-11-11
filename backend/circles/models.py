@@ -54,6 +54,7 @@ class CircleMember(models.Model):
     circle = models.ForeignKey(SkillCircle, on_delete=models.CASCADE, related_name="memberships")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="circle_memberships")
     role = models.CharField(max_length=12, choices=Role.choices, default=Role.LEARNER)
+    is_muted = models.BooleanField(default=False)
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
