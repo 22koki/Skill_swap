@@ -65,3 +65,4 @@ class SwapSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("That user does not currently teach the requested skill.")
 
         return attrs
+
