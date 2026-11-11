@@ -1,20 +1,44 @@
+import { useEffect } from "react";
 import { getSkillVisual } from "./skillVisuals";
 
-export default function ScheduleSwapModal({ swap, form, setForm, onClose, onSubmit }) {
+function prettyTime(value){
+  try{
+    return new Intl.DateTimeFormat(undefined,{
+      weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"
+    }).format(new Date(value));
+  }catch{return value}
+}
+
+export default function ScheduleSwapModal({
+  swap,
+  form,
+  setForm,
+  onClose,
+  onSubmit,
+  suggestions=[],
+  suggestionsLoading=false,
+  availabilityComplete=false,
+  onRefreshSuggestions,
+  scheduleError,
+}) {
   if (!swap) return null;
   const left = getSkillVisual(swap.requested_skill_name);
   const right = getSkillVisual(swap.offered_skill_name);
 
+  useEffect(()=>{
+    onRefreshSuggestions?.(Number(form.duration_minutes||60));
+  },[swap?.id]);
+
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="schedule-modal glass" onMouseDown={e=>e.stopPropagation()}>
+      <div className="schedule-modal glass schedule-modal-advanced" onMouseDown={e=>e.stopPropagation()}>
         <button className="modal-close" onClick={onClose}>×</button>
 
         <div className="schedule-hero">
           <div>
-            <div className="eyebrow">SCHEDULE YOUR SKILLSWAP</div>
-            <h2>Turn the match into a real session.</h2>
-            <p>Choose when and how you want to meet. You can adjust the details later.</p>
+            <div className="eyebrow">SMART SCHEDULING</div>
+            <h2>Pick a time that works for both of you.</h2>
+            <p>SkillSwap checks weekly availability and existing sessions before creating the booking.</p>
           </div>
           <div className="schedule-pair">
             <span className={left.className}>{left.icon} {swap.requested_skill_name}</span>
@@ -22,6 +46,42 @@ export default function ScheduleSwapModal({ swap, form, setForm, onClose, onSubm
             <span className={right.className}>{right.icon} {swap.offered_skill_name}</span>
           </div>
         </div>
+
+        <section className="smart-time-section">
+          <div className="smart-time-head">
+            <div>
+              <small>BEST TIMES FOR BOTH OF YOU</small>
+              <h3>Shared availability</h3>
+            </div>
+            <span className={"availability-status "+(availabilityComplete?"complete":"partial")}>
+              {availabilityComplete?"✓ Both schedules configured":"◐ Partial availability"}
+            </span>
+          </div>
+
+          {suggestionsLoading ? <div className="smart-time-loading">Checking schedules and conflicts…</div> :
+           suggestions.length ? <div className="smart-time-grid">
+            {suggestions.slice(0,4).map((item,index)=>(
+              <button
+                type="button"
+                className={"smart-time-card "+(index===0?"best":"")}
+                key={item.starts_at}
+                onClick={()=>setForm({...form,starts_at:item.starts_at.slice(0,16)})}
+              >
+                <span>{index===0?"⭐":"🕒"}</span>
+                <div><b>{prettyTime(item.starts_at)}</b><small>{item.duration_minutes} min · {item.fit_score}% fit</small></div>
+                {index===0&&<em>Best fit</em>}
+              </button>
+            ))}
+           </div> : <div className="smart-time-empty">
+             <b>No shared slot found automatically.</b>
+             <span>You can choose a time manually. SkillSwap will still check for conflicts before saving.</span>
+           </div>}
+        </section>
+
+        {scheduleError&&<div className="schedule-conflict-banner">
+          <span>⚠</span>
+          <div><b>Scheduling conflict</b><p>{scheduleError}</p></div>
+        </div>}
 
         <form className="schedule-form" onSubmit={onSubmit}>
           <div className="schedule-grid">
@@ -32,7 +92,11 @@ export default function ScheduleSwapModal({ swap, form, setForm, onClose, onSubm
 
             <label>
               <span>Duration</span>
-              <select value={form.duration_minutes} onChange={e=>setForm({...form,duration_minutes:e.target.value})}>
+              <select value={form.duration_minutes} onChange={e=>{
+                const next=e.target.value;
+                setForm({...form,duration_minutes:next});
+                onRefreshSuggestions?.(Number(next));
+              }}>
                 <option value="30">30 minutes</option>
                 <option value="45">45 minutes</option>
                 <option value="60">1 hour</option>
