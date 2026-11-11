@@ -12,6 +12,7 @@ import ProgressionPanel from "./ProgressionPanel";
 import AchievementUnlock from "./AchievementUnlock";
 import NotificationCenter from "./NotificationCenter";
 import SkillNetwork from "./SkillNetwork";
+import SkillCircles from "./SkillCircles";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -97,6 +98,11 @@ export default function App(){
  const [networkOpen,setNetworkOpen]=useState(false);
  const [networkData,setNetworkData]=useState(null);
  const [networkLoading,setNetworkLoading]=useState(false);
+ const [circlesOpen,setCirclesOpen]=useState(false);
+ const [circles,setCircles]=useState([]);
+ const [circlesLoading,setCirclesLoading]=useState(false);
+ const [activeCircle,setActiveCircle]=useState(null);
+ const [circleMessages,setCircleMessages]=useState([]);
  const [reviewForm,setReviewForm]=useState({
   overall_rating:5,
   teaching_quality:5,
@@ -188,6 +194,126 @@ export default function App(){
     if(!searched) setMatches(normalized);
    }
   }catch{}
+ }
+
+ async function loadCircles(){
+  setCirclesLoading(true);
+  try{
+   const res=await api("/circles/");
+   if(res.ok) setCircles(await res.json());
+  }finally{
+   setCirclesLoading(false);
+  }
+ }
+
+ async function openSkillCircles(){
+  setCirclesOpen(true);
+  await loadCircles();
+ }
+
+ async function openCircle(circleId){
+  const res=await api("/circles/"+circleId+"/");
+  const data=await res.json();
+  if(!res.ok){
+   setNotice(data.detail||"Could not open this circle.");
+   return;
+  }
+  setActiveCircle(data);
+  if(data.membership){
+   const msgRes=await api("/circles/"+circleId+"/messages/");
+   if(msgRes.ok) setCircleMessages(await msgRes.json());
+   else setCircleMessages([]);
+  }else{
+   setCircleMessages([]);
+  }
+ }
+
+ async function createCircle(payload){
+  const res=await api("/circles/",{method:"POST",body:JSON.stringify(payload)});
+  const data=await res.json();
+  if(!res.ok){
+   setNotice(data.detail||"Could not create the circle.");
+   return false;
+  }
+  setCircles(prev=>[data,...prev]);
+  setActiveCircle(data);
+  setNotice("Skill Circle created 👥");
+  return true;
+ }
+
+ async function joinCircle(circleId,role="learner"){
+  if(!user){
+   setAuthMode("login");setAuthOpen(true);return;
+  }
+  const res=await api("/circles/"+circleId+"/join/",{method:"POST",body:JSON.stringify({role})});
+  const data=await res.json();
+  if(!res.ok){setNotice(data.detail||"Could not join circle.");return;}
+  setActiveCircle(data);
+  setCircles(prev=>prev.map(c=>c.id===data.id?data:c));
+  const msgRes=await api("/circles/"+circleId+"/messages/");
+  if(msgRes.ok) setCircleMessages(await msgRes.json());
+  setNotice("Joined "+data.title+" ✨");
+ }
+
+ async function leaveCircle(circleId){
+  const res=await api("/circles/"+circleId+"/leave/",{method:"POST"});
+  const data=await res.json();
+  if(!res.ok){setNotice(data.detail||"Could not leave circle.");return;}
+  setActiveCircle(data);
+  setCircles(prev=>prev.map(c=>c.id===data.id?data:c));
+  setCircleMessages([]);
+  setNotice("You left the circle.");
+ }
+
+ async function sendCircleMessage(circleId,body){
+  const res=await api("/circles/"+circleId+"/messages/",{method:"POST",body:JSON.stringify({body})});
+  if(res.ok){
+   const data=await res.json();
+   setCircleMessages(prev=>[...prev,data]);
+  }else{
+   const data=await res.json().catch(()=>({}));
+   setNotice(data.detail||"Could not send message.");
+  }
+ }
+
+ async function addCircleTask(circleId,text){
+  const res=await api("/circles/"+circleId+"/tasks/",{method:"POST",body:JSON.stringify({text})});
+  if(res.ok) await openCircle(circleId);
+ }
+
+ async function toggleCircleTask(taskId,is_done){
+  const res=await api("/circles/tasks/"+taskId+"/",{method:"PATCH",body:JSON.stringify({is_done})});
+  if(res.ok&&activeCircle) await openCircle(activeCircle.id);
+ }
+
+ async function addCircleResource(circleId,payload){
+  const res=await api("/circles/"+circleId+"/resources/",{method:"POST",body:JSON.stringify(payload)});
+  if(res.ok) await openCircle(circleId);
+  else{
+   const data=await res.json().catch(()=>({}));
+   setNotice(data.detail||"Could not share resource.");
+  }
+ }
+
+ async function scheduleCircleSession(circleId,payload){
+  const normalized={...payload,starts_at:new Date(payload.starts_at).toISOString(),duration_minutes:Number(payload.duration_minutes||60)};
+  const res=await api("/circles/"+circleId+"/sessions/",{method:"POST",body:JSON.stringify(normalized)});
+  if(res.ok){
+   await openCircle(circleId);
+   setNotice("Group session scheduled 📅");
+  }else{
+   const data=await res.json().catch(()=>({}));
+   setNotice(data.detail||"Could not schedule session.");
+  }
+ }
+
+ async function generateCircleAIPlan(circleId,payload){
+  const res=await api("/circles/"+circleId+"/ai-plan/",{method:"POST",body:JSON.stringify(payload)});
+  const data=await res.json();
+  if(!res.ok){setNotice(data.detail||"Could not generate the group roadmap.");return;}
+  setActiveCircle(data);
+  setCircles(prev=>prev.map(c=>c.id===data.id?data:c));
+  setNotice(data.ai_plan_source==="openai"?"AI group roadmap generated ✦":"Smart group roadmap generated ✦");
  }
 
  async function openSkillNetwork(){
@@ -863,6 +989,7 @@ export default function App(){
   setProgression(null); setProgressionOpen(false); setAchievementUnlock(null);
   setNotificationOpen(false); setNotifications([]); setNotificationUnread(0);
   setNetworkOpen(false); setNetworkData(null);
+  setCirclesOpen(false); setCircles([]); setActiveCircle(null); setCircleMessages([]);
   setSearched(false); setMatches(communityUsers.map(person=>({...person,score:null,confidence:"",breakdown:{},reasons:[],missing:[],suggested_times:[]})));
  }
 
@@ -1031,6 +1158,10 @@ export default function App(){
        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openSkillNetwork();}}>
         <span className="nav-menu-icon">🕸</span>
         <span><b>Skill Network</b><small>Explore the knowledge graph</small></span>
+       </button>
+       <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openSkillCircles();}}>
+        <span className="nav-menu-icon">👥</span>
+        <span><b>Skill Circles</b><small>Learn together in small groups</small></span>
        </button>
       </div>
     </details>
@@ -1362,6 +1493,28 @@ export default function App(){
     onClose={()=>{setScheduleOpen(false);setSelectedSwap(null)}}
     onSubmit={submitBooking}
   />}
+
+  <SkillCircles
+    open={circlesOpen}
+    circles={circles}
+    loading={circlesLoading}
+    catalog={catalog}
+    user={user}
+    activeCircle={activeCircle}
+    messages={circleMessages}
+    onClose={()=>setCirclesOpen(false)}
+    onCreate={createCircle}
+    onOpenCircle={openCircle}
+    onJoin={joinCircle}
+    onLeave={leaveCircle}
+    onSendMessage={sendCircleMessage}
+    onAddTask={addCircleTask}
+    onToggleTask={toggleCircleTask}
+    onAddResource={addCircleResource}
+    onScheduleSession={scheduleCircleSession}
+    onGenerateAIPlan={generateCircleAIPlan}
+    onPassport={openPassport}
+  />
 
   <SkillNetwork
     open={networkOpen}
