@@ -764,6 +764,8 @@ class SafetyReportCreateView(APIView):
             return Response({"detail": "You cannot report yourself."}, status=400)
 
         evidence = _report_evidence(target_type, target_id, reported_user)
+        if not reported_user and evidence.get("sender_id"):
+            reported_user = User.objects.filter(pk=evidence["sender_id"]).first()
         report = SafetyReport.objects.create(
             reporter=request.user,
             reported_user=reported_user,
