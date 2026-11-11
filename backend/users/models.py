@@ -19,6 +19,12 @@ class Profile(models.Model):
     availability_note = models.CharField(max_length=255, blank=True)
     completed_swaps = models.PositiveIntegerField(default=0)
     average_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    review_count = models.PositiveIntegerField(default=0)
+    teaching_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    communication_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    reliability_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    friendliness_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    would_swap_again_percent = models.PositiveSmallIntegerField(default=0)
 
     def __str__(self):
         return f"{self.user.username}'s profile"
