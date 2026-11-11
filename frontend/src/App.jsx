@@ -214,10 +214,14 @@ export default function App(){
    setChatPartnerOnline(!!presence.online);
    setChatPartnerLastSeen(presence.last_seen||null);
   }
-  if(chatOpen&&activitySocketRef.current?.readyState===WebSocket.OPEN){
+ },[activeConversation?.partner_id,presenceByUser]);
+
+ useEffect(()=>{
+  if(!chatOpen||!activeConversation?.partner_id) return;
+  if(activitySocketRef.current?.readyState===WebSocket.OPEN){
    activitySocketRef.current.send(JSON.stringify({event:"presence_query",user_id:activeConversation.partner_id}));
   }
- },[activeConversation?.partner_id,chatOpen,presenceByUser]);
+ },[activeConversation?.partner_id,chatOpen]);
 
  useEffect(()=>{
   if(!chatOpen||!activeConversation?.swap||!token) return;
