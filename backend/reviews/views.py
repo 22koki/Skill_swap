@@ -8,6 +8,8 @@ from users.models import Profile
 from .models import Review
 from .serializers import ReviewSerializer
 from .services import update_reputation, reputation_badges
+from notifications.models import Notification
+from notifications.services import notify
 
 class ReviewCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -34,6 +36,16 @@ class ReviewCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         review = serializer.save(reviewer=request.user, reviewee=reviewee)
         update_reputation(reviewee)
+        notify(
+            reviewee,
+            Notification.Kind.REVIEW,
+            f"{request.user.get_full_name() or request.user.username} reviewed your SkillSwap",
+            f"{review.overall_rating}/5 overall · {review.comment[:100] if review.comment else 'New reputation feedback received'}",
+            actor=request.user,
+            action_type="review",
+            target_id=review.id,
+            dedupe_key=f"review:{review.id}",
+        )
 
         return Response(ReviewSerializer(review).data, status=status.HTTP_201_CREATED)
 
