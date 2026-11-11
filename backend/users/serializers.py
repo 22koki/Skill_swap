@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Profile
+from .models import Profile, AvailabilitySlot
 
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -43,3 +43,20 @@ class RegisterSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(**validated_data)
         Profile.objects.get_or_create(user=user)
         return user
+
+
+class AvailabilitySlotSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AvailabilitySlot
+        fields = ["id", "weekday", "start_time", "end_time"]
+        read_only_fields = ["id"]
+
+    def validate_weekday(self, value):
+        if value < 0 or value > 6:
+            raise serializers.ValidationError("Weekday must be between 0 and 6.")
+        return value
+
+    def validate(self, attrs):
+        if attrs["end_time"] <= attrs["start_time"]:
+            raise serializers.ValidationError("End time must be after start time.")
+        return attrs
