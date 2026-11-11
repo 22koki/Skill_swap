@@ -65,6 +65,40 @@ export default function SkillPassport({open,passport,onClose}){
             <div><strong>{passport.stats.would_swap_again_percent}%</strong><span>Would swap again</span></div>
           </div>
 
+          {passport.progression && <section className="passport-section passport-progression-section">
+            <div className="passport-progression-head">
+              <div className="passport-progression-level">
+                <span>{passport.progression.level.icon}</span>
+                <div>
+                  <small>LEVEL {passport.progression.level.level}</small>
+                  <h3>{passport.progression.level.name}</h3>
+                </div>
+              </div>
+              <div className="passport-progression-xp">
+                <strong>{passport.progression.xp.toLocaleString()}</strong>
+                <span>XP</span>
+              </div>
+            </div>
+
+            <div className="passport-progression-track">
+              <i style={{width:passport.progression.level_progress+"%"}}></i>
+            </div>
+            <div className="passport-progression-meta">
+              <span>🔥 {passport.progression.current_streak} week streak</span>
+              <span>⚡ Best: {passport.progression.best_streak} weeks</span>
+              <span>🏅 {passport.progression.achievements_unlocked}/{passport.progression.achievements_total} achievements</span>
+              <span>{passport.progression.next_level ? passport.progression.xp_to_next+" XP to "+passport.progression.next_level.name : "Max level"}</span>
+            </div>
+
+            {!!passport.progression.unlocked?.length && <div className="passport-achievement-ribbon">
+              {passport.progression.unlocked.slice(0,6).map(item=>(
+                <div className="passport-achievement-token" key={item.key}>
+                  <span>{item.icon}</span><b>{item.title}</b>
+                </div>
+              ))}
+            </div>}
+          </section>}
+
           <div className="passport-section">
             <div className="passport-section-head">
               <div>
