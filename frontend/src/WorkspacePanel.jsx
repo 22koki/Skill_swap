@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { getSkillVisual } from "./skillVisuals";
+import AISessionPlanner from "./AISessionPlanner";
 
 export default function WorkspacePanel({
   open,
@@ -18,6 +19,15 @@ export default function WorkspacePanel({
   onToggleChecklist,
   onDeleteChecklist,
   saving,
+  aiSetup,
+  setAiSetup,
+  onGenerateAIPlan,
+  aiGenerating,
+  onAddAIPlanChecklist,
+  aiAddingChecklist,
+  onPlanChange,
+  onSaveAIPlan,
+  aiSavingPlan,
 }){
   const [tab,setTab]=useState("plan");
   if(!open || !workspace) return null;
@@ -30,6 +40,7 @@ export default function WorkspacePanel({
   const effectiveProgress=Math.max(Number(form.progress_percentage||0),checklistProgress);
 
   const tabs=[
+    ["ai","✦ AI Plan"],
     ["plan","Plan"],
     ["checklist","Checklist"],
     ["resources","Resources"],
@@ -73,6 +84,21 @@ export default function WorkspacePanel({
         </div>
 
         <div className="workspace-body">
+          {tab==="ai" && (
+            <AISessionPlanner
+              workspace={workspace}
+              setup={aiSetup}
+              setSetup={setAiSetup}
+              onGenerate={onGenerateAIPlan}
+              generating={aiGenerating}
+              onAddChecklist={onAddAIPlanChecklist}
+              addingChecklist={aiAddingChecklist}
+              onPlanChange={onPlanChange}
+              onSavePlan={onSaveAIPlan}
+              savingPlan={aiSavingPlan}
+            />
+          )}
+
           {tab==="plan" && (
             <div className="workspace-grid">
               <label className="workspace-field">
