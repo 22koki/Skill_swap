@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from .models import Booking
 from .serializers import BookingSerializer
+from users.models import Profile
 
 class BookingListCreateView(generics.ListCreateAPIView):
     serializer_class = BookingSerializer
@@ -46,9 +47,16 @@ class BookingActionView(APIView):
         if action == "cancel":
             booking.status = Booking.Status.CANCELLED
         elif action == "complete":
-            booking.status = Booking.Status.COMPLETED
-            booking.swap.status = "completed"
-            booking.swap.save(update_fields=["status", "updated_at"])
+            if booking.status != Booking.Status.COMPLETED:
+                booking.status = Booking.Status.COMPLETED
+                booking.swap.status = "completed"
+                booking.swap.save(update_fields=["status", "updated_at"])
+                for user in (booking.swap.requester, booking.swap.recipient):
+                    profile, _ = Profile.objects.get_or_create(user=user)
+                    profile.completed_swaps += 1
+                    profile.save(update_fields=["completed_swaps"])
+            else:
+                return Response({"detail": "This session is already completed."}, status=400)
         else:
             return Response({"detail": "Unknown booking action."}, status=400)
 
