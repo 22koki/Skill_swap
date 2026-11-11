@@ -61,6 +61,15 @@ export default function App(){
  const [workspaceResourceForm,setWorkspaceResourceForm]=useState({title:"",url:"",kind:"link"});
  const [workspaceChecklistText,setWorkspaceChecklistText]=useState("");
  const [workspaceSaving,setWorkspaceSaving]=useState(false);
+ const [workspaceAISetup,setWorkspaceAISetup]=useState({
+  goal:"",
+  learner_level:"beginner",
+  learning_style:"step_by_step",
+  session_count:3
+ });
+ const [workspaceAIGenerating,setWorkspaceAIGenerating]=useState(false);
+ const [workspaceAIAddingChecklist,setWorkspaceAIAddingChecklist]=useState(false);
+ const [workspaceAISavingPlan,setWorkspaceAISavingPlan]=useState(false);
  const [reviewOpen,setReviewOpen]=useState(false);
  const [reviewBooking,setReviewBooking]=useState(null);
  const [reviewSaving,setReviewSaving]=useState(false);
@@ -454,6 +463,12 @@ export default function App(){
    });
    setWorkspaceResourceForm({title:"",url:"",kind:"link"});
    setWorkspaceChecklistText("");
+   setWorkspaceAISetup({
+    goal:data.ai_goal||data.goals||"",
+    learner_level:data.ai_learner_level||"beginner",
+    learning_style:data.ai_learning_style||"step_by_step",
+    session_count:data.ai_session_count||3
+   });
    setWorkspaceOpen(true);
   }catch{
    setNotice("Could not open workspace.");
@@ -482,6 +497,65 @@ export default function App(){
    });
    setNotice("Workspace saved.");
   }finally{ setWorkspaceSaving(false); }
+ }
+
+ async function generateWorkspaceAIPlan(){
+  if(!workspace?.booking) return;
+  setWorkspaceAIGenerating(true);
+  try{
+   const res=await api("/workspaces/bookings/"+workspace.booking+"/ai-plan/generate/",{
+    method:"POST",
+    body:JSON.stringify(workspaceAISetup)
+   });
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not generate the learning plan.");
+    return;
+   }
+   setWorkspace(data);
+   setNotice(data.ai_plan_source==="openai"?"AI learning plan generated ✦":"Smart learning plan generated ✦");
+  }catch{
+   setNotice("Could not generate the learning plan.");
+  }finally{
+   setWorkspaceAIGenerating(false);
+  }
+ }
+
+ async function addWorkspaceAIPlanChecklist(){
+  if(!workspace?.booking) return;
+  setWorkspaceAIAddingChecklist(true);
+  try{
+   const res=await api("/workspaces/bookings/"+workspace.booking+"/ai-plan/checklist/",{method:"POST"});
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not add plan tasks.");
+    return;
+   }
+   setWorkspace(data.workspace||workspace);
+   setNotice((data.created?.length||0)+" AI plan tasks added to the shared checklist.");
+  }finally{
+   setWorkspaceAIAddingChecklist(false);
+  }
+ }
+
+ async function saveWorkspaceAIPlan(){
+  if(!workspace?.booking || !workspace?.ai_plan) return;
+  setWorkspaceAISavingPlan(true);
+  try{
+   const res=await api("/workspaces/bookings/"+workspace.booking+"/",{
+    method:"PATCH",
+    body:JSON.stringify({ai_plan:workspace.ai_plan})
+   });
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not save roadmap edits.");
+    return;
+   }
+   setWorkspace(data);
+   setNotice("AI roadmap edits saved.");
+  }finally{
+   setWorkspaceAISavingPlan(false);
+  }
  }
 
  async function addWorkspaceResource(){
@@ -1190,6 +1264,15 @@ export default function App(){
     onToggleChecklist={toggleWorkspaceChecklist}
     onDeleteChecklist={deleteWorkspaceChecklist}
     saving={workspaceSaving}
+    aiSetup={workspaceAISetup}
+    setAiSetup={setWorkspaceAISetup}
+    onGenerateAIPlan={generateWorkspaceAIPlan}
+    aiGenerating={workspaceAIGenerating}
+    onAddAIPlanChecklist={addWorkspaceAIPlanChecklist}
+    aiAddingChecklist={workspaceAIAddingChecklist}
+    onPlanChange={plan=>setWorkspace(prev=>({...prev,ai_plan:plan}))}
+    onSaveAIPlan={saveWorkspaceAIPlan}
+    aiSavingPlan={workspaceAISavingPlan}
   />
 
   <ChatPanel
