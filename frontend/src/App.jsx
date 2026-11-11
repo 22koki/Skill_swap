@@ -269,6 +269,11 @@ export default function App(){
      const ids=new Set(data.message_ids||[]);
      setChatMessages(prev=>prev.map(m=>ids.has(m.id)?{...m,read_at:data.read_at}:m));
      loadConversations();
+    }else if(data.event==="blocked"){
+     setNotice(data.detail||"This chat is no longer available.");
+     setChatOpen(false);
+     setActiveConversation(null);
+     setChatMessages([]);
     }
    };
    socket.onclose=()=>{
