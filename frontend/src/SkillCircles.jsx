@@ -43,6 +43,9 @@ export default function SkillCircles({
   onScheduleSession,
   onGenerateAIPlan,
   onPassport,
+  onModerateMember,
+  onDeleteMessage,
+  onReport,
   focusCircleId,
 }){
   const [view,setView]=useState("browse");
@@ -374,6 +377,10 @@ export default function SkillCircles({
                   </>
                 )}
                 {isMember&&circle.created_by!==user?.id&&<button className="outline" onClick={()=>onLeave(circle.id)}>Leave circle</button>}
+                {user&&<button className="outline" onClick={()=>onReport?.({
+                  target_type:"circle",target_id:circle.id,reported_user:circle.created_by,
+                  label:circle.title,icon:"👥"
+                })}>⚠ Report circle</button>}
               </div>
             </section>
 
@@ -449,6 +456,12 @@ export default function SkillCircles({
                         <div><b>{member.name}</b><small>@{member.username}</small></div>
                         <span className={"circle-member-presence "+(onlineMemberIds.includes(member.user_id)?"online":"")}></span>
                         <em className={member.role}>{member.role}</em>
+                        {member.is_muted&&<small className="circle-muted-label">Muted</small>}
+                        {isMentor&&member.user_id!==circle.created_by&&member.user_id!==user?.id&&<div className="circle-member-mod-actions" onClick={e=>e.stopPropagation()}>
+                          <button title={member.is_muted?"Unmute":"Mute"} onClick={()=>onModerateMember?.(circle.id,member.user_id,member.is_muted?"unmute":"mute")}>{member.is_muted?"🔊":"🔇"}</button>
+                          <button title={member.role==="mentor"?"Make learner":"Make mentor"} onClick={()=>onModerateMember?.(circle.id,member.user_id,member.role==="mentor"?"demote":"promote")}>{member.role==="mentor"?"🌱":"🎓"}</button>
+                          <button title="Remove member" onClick={()=>onModerateMember?.(circle.id,member.user_id,"remove")}>✕</button>
+                        </div>}
                       </button>
                     ))}
                   </div>
@@ -478,6 +491,13 @@ export default function SkillCircles({
                     {isMember ? messages.map(msg=>(
                       <div className={"circle-chat-message "+(msg.sender_id===user?.id?"mine":"")} key={msg.id}>
                         <b>{msg.sender_name}</b><p>{msg.body}</p><small>{fmt(msg.created_at)}</small>
+                        <div className="circle-message-safety">
+                          {msg.sender_id!==user?.id&&<button onClick={()=>onReport?.({
+                            target_type:"circle_message",target_id:msg.id,reported_user:msg.sender_id,
+                            label:"Message from "+msg.sender_name,icon:"💬"
+                          })}>Report</button>}
+                          {isMentor&&<button onClick={()=>onDeleteMessage?.(circle.id,msg.id)}>Delete</button>}
+                        </div>
                       </div>
                     )) : <div className="circle-inline-empty">Join the circle to view the group chat.</div>}
                     {isMember&&typingUsers.length>0&&<div className="circle-typing-indicator">
