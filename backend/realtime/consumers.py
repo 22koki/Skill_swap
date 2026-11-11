@@ -59,9 +59,16 @@ def get_swap_for_user(swap_id, user):
 def create_direct_message(swap_id, user, body):
     swap = Swap.objects.select_related("requester", "recipient").get(pk=swap_id)
     conversation, _ = Conversation.objects.get_or_create(swap=swap)
-    message = Message.objects.create(conversation=conversation, sender=user, body=body)
-    conversation.save(update_fields=["updated_at"])
     recipient = swap.recipient if swap.requester_id == user.id else swap.requester
+    recipient_presence = UserPresence.objects.filter(user=recipient).first()
+    delivered_at = timezone.now() if recipient_presence and recipient_presence.connection_count > 0 else None
+    message = Message.objects.create(
+        conversation=conversation,
+        sender=user,
+        body=body,
+        delivered_at=delivered_at,
+    )
+    conversation.save(update_fields=["updated_at"])
 
     profile = getattr(user, "profile", None)
     payload = {
@@ -71,6 +78,7 @@ def create_direct_message(swap_id, user, body):
         "sender_avatar_url": profile.avatar_url if profile else "",
         "body": message.body,
         "created_at": message.created_at.isoformat(),
+        "delivered_at": message.delivered_at.isoformat() if message.delivered_at else None,
         "read_at": None,
     }
 
