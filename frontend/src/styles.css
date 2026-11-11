@@ -1064,3 +1064,38 @@ html{scroll-behavior:smooth}.visual-button{border:0;cursor:pointer}.chip{border:
   .profile-reputation-card{grid-template-columns:1fr}.rep-score{border-right:0;border-bottom:1px solid rgba(255,255,255,.16);padding:0 0 10px}
   .rep-metrics{grid-template-columns:1fr 1fr}.rep-footer{text-align:left}
 }
+
+/* Real community discovery cards */
+.community-person-card{padding:0;overflow:hidden}
+.community-card-top{
+  display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;
+  padding:16px 16px 12px
+}
+.community-avatar-wrap{width:68px;height:68px;border-radius:20px;overflow:hidden;flex:0 0 auto}
+.community-avatar-img{width:100%;height:100%;object-fit:cover;display:block}
+.community-avatar-fallback{
+  width:100%;height:100%;display:grid;place-items:center;
+  background:linear-gradient(145deg,#8f68f6,#ff9a78);color:#fff;font:800 20px Manrope
+}
+.community-card-head h3{margin:0;font:800 20px Manrope}
+.community-card-head small{display:block;margin-top:3px;color:#857b90;font-size:9px}
+.community-match-pill{
+  padding:7px 9px;border-radius:999px;font-size:9px;font-weight:900;white-space:nowrap
+}
+.community-match-pill.strong{background:#e4f8ec;color:#16834b}
+.community-match-pill.partial{background:#fff3df;color:#ad6a14}
+.community-match-pill.none{background:#f0ebf6;color:#7c7188}
+.community-match-pill.community{background:#eee8ff;color:#6137cd}
+.community-skill-block{padding:0 16px 10px;display:grid;gap:3px}
+.community-skill-block span{font-size:8px;text-transform:uppercase;letter-spacing:.08em;font-weight:900;color:#91879c}
+.community-skill-block b{font-size:12px;color:#33283f}
+.community-card-footer{
+  margin-top:4px;padding:13px 16px 16px;border-top:1px solid #eee7f5;
+  display:flex;justify-content:space-between;gap:12px;align-items:center
+}
+.community-card-footer small{font-size:9px;color:#756b80}
+@media(max-width:700px){
+  .community-card-top{grid-template-columns:auto 1fr}
+  .community-match-pill{grid-column:1/-1;width:max-content}
+  .community-card-footer{flex-direction:column;align-items:stretch}
+}
