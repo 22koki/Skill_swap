@@ -986,38 +986,101 @@ export default function App(){
  return <main className="app">
   {notice && <button className="toast" onClick={()=>setNotice("")}>{notice} ×</button>}
 
-  <nav className="nav glass">
-   <a className="brand" href="#top"><span>↔</span>SkillSwap</a>
-   <div className="links">
-    <a href="#discover">Discover</a>
-    {user && <a className="request-nav-link" href="#requests">Requests{swaps.filter(s=>s.recipient===user.id&&s.status==="proposed").length>0&&<span>{swaps.filter(s=>s.recipient===user.id&&s.status==="proposed").length}</span>}</a>}
-    {user && <a href="#bookings">Bookings</a>}
-    {user && <button className="nav-message-button" onClick={()=>{
+  <nav className="nav glass nav-refined">
+   <a className="brand" href="#top"><span>↔</span><b>SkillSwap</b></a>
+
+   <div className="links nav-main-links">
+    <a className="nav-primary-link" href="#discover">Discover</a>
+
+    {user && <a className="nav-primary-link request-nav-link" href="#requests">
+      Requests
+      {swaps.filter(s=>s.recipient===user.id&&s.status==="proposed").length>0 &&
+       <span>{swaps.filter(s=>s.recipient===user.id&&s.status==="proposed").length}</span>}
+    </a>}
+
+    {user && <a className="nav-primary-link" href="#bookings">Bookings</a>}
+
+    {user && <button className="nav-primary-link nav-message-button" onClick={()=>{
       const first=conversations[0];
       if(first) openChat(first.swap);
       else setNotice("Your messages will appear after you accept a SkillSwap.");
     }}>
       Messages
       {conversations.reduce((sum,c)=>sum+(c.unread_count||0),0)>0 &&
-        <span>{conversations.reduce((sum,c)=>sum+(c.unread_count||0),0)}</span>}
+       <span>{conversations.reduce((sum,c)=>sum+(c.unread_count||0),0)}</span>}
     </button>}
-    <a href="#how">How it works</a>
-    <a href="#community">Community</a>
-    <button className="nav-network-button" onClick={openSkillNetwork}>Skill Network</button>
+
+    <details className="nav-dropdown nav-explore">
+      <summary>Explore <span>⌄</span></summary>
+      <div className="nav-dropdown-menu nav-explore-menu">
+       <div className="nav-dropdown-label">EXPLORE SKILLSWAP</div>
+       <a href="#how" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}>
+        <span className="nav-menu-icon">✦</span>
+        <span><b>How it works</b><small>See the SkillSwap journey</small></span>
+       </a>
+       <a href="#community" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}>
+        <span className="nav-menu-icon">👥</span>
+        <span><b>Community</b><small>Browse people and skills</small></span>
+       </a>
+       <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openSkillNetwork();}}>
+        <span className="nav-menu-icon">🕸</span>
+        <span><b>Skill Network</b><small>Explore the knowledge graph</small></span>
+       </button>
+      </div>
+    </details>
    </div>
-   <div className="actions">
+
+   <div className="actions nav-actions">
     {user ? <>
-      <button className="ghost" onClick={()=>setProfileOpen(true)}>My profile</button>
-      <button className="ghost passport-nav-button" disabled={passportLoading} onClick={()=>openPassport(user.id)}>Skill Passport</button>
-      <button className="notification-bell" onClick={()=>{setNotificationOpen(true);loadNotifications();}} aria-label="Notifications">
+      <button className="notification-bell nav-icon-button" onClick={()=>{setNotificationOpen(true);loadNotifications();}} aria-label="Notifications">
        <span className="notification-bell-icon">🔔</span>
        {notificationUnread>0 && <b>{notificationUnread>99?"99+":notificationUnread}</b>}
       </button>
-      <span className="welcome">Hi, {user.first_name||user.username}</span>
-      <button className="ghost" onClick={logout}>Log out</button>
+
+      <details className="nav-dropdown nav-account">
+       <summary>
+        <span className="nav-account-avatar">
+         {user.profile?.avatar_url
+          ? <img src={user.profile.avatar_url} alt="" />
+          : <span>{(user.first_name||user.username||"S").slice(0,1).toUpperCase()}</span>}
+        </span>
+        <span className="nav-account-copy">
+         <small>Signed in as</small>
+         <b>{user.first_name||user.username}</b>
+        </span>
+        <span className="nav-chevron">⌄</span>
+       </summary>
+
+       <div className="nav-dropdown-menu nav-account-menu">
+        <div className="nav-account-menu-head">
+         <div className="nav-account-avatar large">
+          {user.profile?.avatar_url
+           ? <img src={user.profile.avatar_url} alt="" />
+           : <span>{(user.first_name||user.username||"S").slice(0,1).toUpperCase()}</span>}
+         </div>
+         <div>
+          <b>{user.first_name||user.username}</b>
+          <small>@{user.username}</small>
+         </div>
+        </div>
+
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setProfileOpen(true);}}>
+         <span className="nav-menu-icon">👤</span>
+         <span><b>My profile</b><small>Skills, availability and details</small></span>
+        </button>
+        <button disabled={passportLoading} onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openPassport(user.id);}}>
+         <span className="nav-menu-icon">🛂</span>
+         <span><b>Skill Passport</b><small>Your learning identity</small></span>
+        </button>
+        <button className="nav-logout-item" onClick={logout}>
+         <span className="nav-menu-icon">↪</span>
+         <span><b>Log out</b><small>Sign out of SkillSwap</small></span>
+        </button>
+       </div>
+      </details>
     </> : <>
-      <button className="ghost" onClick={()=>{setAuthMode("login");setAuthOpen(true)}}>Log in</button>
-      <button className="primary" onClick={()=>{setAuthMode("register");setAuthOpen(true)}}>Join SkillSwap</button>
+      <button className="ghost nav-login-button" onClick={()=>{setAuthMode("login");setAuthOpen(true)}}>Log in</button>
+      <button className="primary nav-join-button" onClick={()=>{setAuthMode("register");setAuthOpen(true)}}>Join SkillSwap</button>
     </>}
    </div>
   </nav>
