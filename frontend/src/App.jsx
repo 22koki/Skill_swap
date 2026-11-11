@@ -725,12 +725,40 @@ export default function App(){
        <button className="primary" onClick={()=>setSkillsOpen(true)}>Manage my skills</button>
       </div>
     </div>
-    <div className="profile-meta">
-      <span>📍 {user.profile?.location||"Location not set"}</span>
-      <span>🔄 {user.profile?.session_preference||"both"}</span>
-      <span>⭐ {user.profile?.average_rating||"0.00"}</span>
-      <span>🎓 {teachSkills.length} teaching</span>
-      <span>🌱 {learnSkills.length} learning</span>
+    <div className="profile-reputation-wrap">
+      <div className="profile-meta">
+        <span>📍 {user.profile?.location||"Location not set"}</span>
+        <span>🔄 {user.profile?.session_preference||"both"}</span>
+        <span>⭐ {user.profile?.average_rating||"0.00"} · {user.profile?.review_count||0} reviews</span>
+        <span>🎓 {teachSkills.length} teaching</span>
+        <span>🌱 {learnSkills.length} learning</span>
+        <span>🤝 {user.profile?.completed_swaps||0} completed</span>
+      </div>
+
+      {(user.profile?.review_count||0)>0 && <div className="profile-reputation-card">
+        <div className="rep-score">
+          <strong>{Number(user.profile?.average_rating||0).toFixed(1)}</strong>
+          <span>★ reputation</span>
+        </div>
+        <div className="rep-metrics">
+          <span><small>Teaching</small><b>{Number(user.profile?.teaching_rating||0).toFixed(1)}</b></span>
+          <span><small>Communication</small><b>{Number(user.profile?.communication_rating||0).toFixed(1)}</b></span>
+          <span><small>Reliability</small><b>{Number(user.profile?.reliability_rating||0).toFixed(1)}</b></span>
+          <span><small>Friendliness</small><b>{Number(user.profile?.friendliness_rating||0).toFixed(1)}</b></span>
+        </div>
+        <div className="rep-footer">
+          <b>{user.profile?.would_swap_again_percent||0}%</b>
+          <span>would SkillSwap again</span>
+        </div>
+        <div className="rep-badges">
+          {(user.profile?.completed_swaps||0)>=1 && <span>🤝 First Swap</span>}
+          {(user.profile?.review_count||0)>=3 && Number(user.profile?.teaching_rating||0)>=4.5 && <span>🎓 Great Teacher</span>}
+          {(user.profile?.review_count||0)>=3 && Number(user.profile?.reliability_rating||0)>=4.5 && <span>🛡️ Reliable Swapper</span>}
+          {(user.profile?.review_count||0)>=3 && Number(user.profile?.communication_rating||0)>=4.5 && <span>💬 Great Communicator</span>}
+          {(user.profile?.review_count||0)>=5 && Number(user.profile?.average_rating||0)>=4.7 && <span>⭐ Community Favorite</span>}
+          {(user.profile?.completed_swaps||0)>=10 && <span>🏆 10+ Swaps</span>}
+        </div>
+      </div>}
     </div>
   </section>}
 
