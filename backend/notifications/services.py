@@ -1,8 +1,27 @@
 from datetime import timedelta
 
 from django.utils import timezone
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 from .models import Notification, NotificationPreference
+
+def _broadcast_notification(notification):
+    if not notification:
+        return
+    from .serializers import NotificationSerializer
+
+    channel_layer = get_channel_layer()
+    if not channel_layer:
+        return
+    async_to_sync(channel_layer.group_send)(
+        f"user.{notification.user_id}",
+        {
+            "type": "notification.event",
+            "notification": NotificationSerializer(notification).data,
+        },
+    )
+
 
 PREFERENCE_FIELDS = {
     Notification.Kind.SWAP: "swaps",
@@ -29,7 +48,7 @@ def notify(user, kind, title, body="", actor=None, action_type="", target_id=Non
         if existing:
             return existing
 
-    return Notification.objects.create(
+    notification = Notification.objects.create(
         user=user,
         actor=actor,
         kind=kind,
@@ -40,6 +59,8 @@ def notify(user, kind, title, body="", actor=None, action_type="", target_id=Non
         dedupe_key=dedupe_key,
         metadata=metadata or {},
     )
+    _broadcast_notification(notification)
+    return notification
 
 
 def sync_session_reminders(user):
