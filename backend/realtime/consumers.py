@@ -8,6 +8,7 @@ from notifications.models import Notification
 from notifications.services import notify
 from swaps.models import Swap
 from circles.models import SkillCircle, CircleMember, CircleMessage
+from users.safety import interaction_block_reason
 
 
 @database_sync_to_async
@@ -51,6 +52,9 @@ def get_swap_for_user(swap_id, user):
     except Swap.DoesNotExist:
         return None
     if user not in {swap.requester, swap.recipient} or swap.status not in {"accepted", "completed"}:
+        return None
+    partner = swap.recipient if swap.requester_id == user.id else swap.requester
+    if interaction_block_reason(user, partner):
         return None
     return swap
 
@@ -122,6 +126,9 @@ def get_circle_for_user(circle_id, user):
 @database_sync_to_async
 def create_circle_message(circle_id, user, body):
     circle = SkillCircle.objects.get(pk=circle_id)
+    membership = CircleMember.objects.filter(circle=circle, user=user).first()
+    if not membership or getattr(membership, "is_muted", False):
+        return None
     message = CircleMessage.objects.create(circle=circle, sender=user, body=body)
     profile = getattr(user, "profile", None)
     return {
@@ -330,10 +337,11 @@ class CircleChatConsumer(AsyncJsonWebsocketConsumer):
             if not body or len(body) > 3000:
                 return
             message = await create_circle_message(self.circle_id, self.user, body)
-            await self.channel_layer.group_send(
-                self.group_name,
-                {"type": "circle_message_event", "message": message},
-            )
+            if message:
+                await self.channel_layer.group_send(
+                    self.group_name,
+                    {"type": "circle_message_event", "message": message},
+                )
         elif event == "typing":
             await self.channel_layer.group_send(
                 self.group_name,
