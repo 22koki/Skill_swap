@@ -7,9 +7,11 @@ class ProfileSerializer(serializers.ModelSerializer):
         model = Profile
         fields = [
             "bio", "location", "avatar_url", "session_preference",
-            "availability_note", "completed_swaps", "average_rating",
+            "availability_note", "completed_swaps", "average_rating", "review_count",
+            "teaching_rating", "communication_rating", "reliability_rating",
+            "friendliness_rating", "would_swap_again_percent",
         ]
-        read_only_fields = ["completed_swaps", "average_rating"]
+        read_only_fields = ["completed_swaps", "average_rating", "review_count", "teaching_rating", "communication_rating", "reliability_rating", "friendliness_rating", "would_swap_again_percent"]
 
 class UserSerializer(serializers.ModelSerializer):
     profile = ProfileSerializer()
