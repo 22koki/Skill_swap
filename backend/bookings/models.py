@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from swaps.models import Swap
 
@@ -38,7 +39,7 @@ class RescheduleRequest(models.Model):
 
     booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name="reschedule_requests")
     requested_by = models.ForeignKey(
-        "auth.User",
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="booking_reschedule_requests",
     )
