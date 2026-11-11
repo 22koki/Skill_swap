@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from bookings.models import Booking
 from .models import SessionWorkspace, WorkspaceResource, WorkspaceChecklistItem
+from .ai_planner import generate_learning_plan, checklist_items_from_plan
 from .serializers import (
     SessionWorkspaceSerializer,
     WorkspaceResourceSerializer,
@@ -140,3 +141,96 @@ class ChecklistDetailView(APIView):
             return Response({"detail": "You are not part of this workspace."}, status=403)
         item.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AIPlanGenerateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, booking_id):
+        booking = booking_for_user(request, booking_id)
+        if not booking:
+            return Response({"detail": "You are not part of this booking."}, status=403)
+        if booking.status == Booking.Status.CANCELLED:
+            return Response({"detail": "Cancelled bookings cannot generate a learning plan."}, status=400)
+
+        workspace, _ = SessionWorkspace.objects.get_or_create(booking=booking)
+
+        learner_level = str(request.data.get("learner_level", "beginner")).strip().lower()
+        if learner_level not in {"beginner", "intermediate", "advanced", "expert"}:
+            learner_level = "beginner"
+
+        learning_style = str(request.data.get("learning_style", "step_by_step")).strip().lower()
+        if learning_style not in {"practical", "theory_first", "project_based", "fast_paced", "step_by_step"}:
+            learning_style = "step_by_step"
+
+        try:
+            session_count = max(1, min(int(request.data.get("session_count", 3)), 6))
+        except (TypeError, ValueError):
+            session_count = 3
+
+        goal = str(request.data.get("goal", "")).strip()[:500]
+        duration = booking.duration_minutes or 60
+        swap = booking.swap
+
+        if swap.requester == request.user:
+            learn_skill = swap.requested_skill.name
+            partner = swap.recipient
+        else:
+            learn_skill = swap.offered_skill.name
+            partner = swap.requester
+
+        partner_name = partner.get_full_name() or partner.username
+        plan, source = generate_learning_plan(
+            skill=learn_skill,
+            goal=goal,
+            learner_level=learner_level,
+            learning_style=learning_style,
+            session_count=session_count,
+            duration_minutes=duration,
+            partner_context=f"Peer learning with {partner_name}",
+        )
+
+        workspace.ai_plan = plan
+        workspace.ai_plan_source = source
+        workspace.ai_goal = goal or plan.get("goal", "")
+        workspace.ai_learner_level = learner_level
+        workspace.ai_learning_style = learning_style
+        workspace.ai_session_count = session_count
+        workspace.ai_plan_updated_at = timezone.now()
+        workspace.save(update_fields=[
+            "ai_plan", "ai_plan_source", "ai_goal", "ai_learner_level",
+            "ai_learning_style", "ai_session_count", "ai_plan_updated_at", "updated_at",
+        ])
+
+        return Response(SessionWorkspaceSerializer(workspace, context={"request": request}).data)
+
+
+class AIPlanChecklistView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, booking_id):
+        booking = booking_for_user(request, booking_id)
+        if not booking:
+            return Response({"detail": "You are not part of this booking."}, status=403)
+
+        workspace, _ = SessionWorkspace.objects.get_or_create(booking=booking)
+        if not workspace.ai_plan:
+            return Response({"detail": "Generate an AI learning plan first."}, status=400)
+
+        created = []
+        existing = set(workspace.checklist.values_list("text", flat=True))
+        for text in checklist_items_from_plan(workspace.ai_plan):
+            if text in existing:
+                continue
+            item = WorkspaceChecklistItem.objects.create(
+                workspace=workspace,
+                text=text[:220],
+                created_by=request.user,
+            )
+            created.append(item)
+            existing.add(text)
+
+        return Response({
+            "created": WorkspaceChecklistItemSerializer(created, many=True).data,
+            "workspace": SessionWorkspaceSerializer(workspace, context={"request": request}).data,
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
