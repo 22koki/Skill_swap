@@ -70,6 +70,11 @@ export default function App(){
  const [workspaceAIGenerating,setWorkspaceAIGenerating]=useState(false);
  const [workspaceAIAddingChecklist,setWorkspaceAIAddingChecklist]=useState(false);
  const [workspaceAISavingPlan,setWorkspaceAISavingPlan]=useState(false);
+ const [recapReflection,setRecapReflection]=useState("");
+ const [recapChallenge,setRecapChallenge]=useState("");
+ const [recapConfidence,setRecapConfidence]=useState(3);
+ const [recapGenerating,setRecapGenerating]=useState(false);
+ const [recapAddingChecklist,setRecapAddingChecklist]=useState(false);
  const [reviewOpen,setReviewOpen]=useState(false);
  const [reviewBooking,setReviewBooking]=useState(null);
  const [reviewSaving,setReviewSaving]=useState(false);
@@ -463,6 +468,9 @@ export default function App(){
    });
    setWorkspaceResourceForm({title:"",url:"",kind:"link"});
    setWorkspaceChecklistText("");
+   setRecapReflection(data.my_recap?.reflection||"");
+   setRecapChallenge(data.my_recap?.challenge||"");
+   setRecapConfidence(data.my_recap?.confidence||3);
    setWorkspaceAISetup({
     goal:data.ai_goal||data.goals||"",
     learner_level:data.ai_learner_level||"beginner",
@@ -555,6 +563,49 @@ export default function App(){
    setNotice("AI roadmap edits saved.");
   }finally{
    setWorkspaceAISavingPlan(false);
+  }
+ }
+
+ async function generateSessionRecap(){
+  if(!workspace?.booking) return;
+  setRecapGenerating(true);
+  try{
+   const res=await api("/workspaces/bookings/"+workspace.booking+"/recap/generate/",{
+    method:"POST",
+    body:JSON.stringify({
+      reflection:recapReflection,
+      challenge:recapChallenge,
+      confidence:Number(recapConfidence)
+    })
+   });
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not generate your session recap.");
+    return;
+   }
+   setWorkspace(prev=>({...prev,my_recap:data}));
+   setNotice(data.source==="openai"?"AI session recap generated ✦":"Smart session recap generated ✦");
+  }catch{
+   setNotice("Could not generate your session recap.");
+  }finally{
+   setRecapGenerating(false);
+  }
+ }
+
+ async function addRecapChecklist(){
+  if(!workspace?.booking) return;
+  setRecapAddingChecklist(true);
+  try{
+   const res=await api("/workspaces/bookings/"+workspace.booking+"/recap/checklist/",{method:"POST"});
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not add recap next steps.");
+    return;
+   }
+   setWorkspace(data.workspace||workspace);
+   setNotice((data.created?.length||0)+" personalized next steps added to the checklist.");
+  }finally{
+   setRecapAddingChecklist(false);
   }
  }
 
@@ -1273,6 +1324,16 @@ export default function App(){
     onPlanChange={plan=>setWorkspace(prev=>({...prev,ai_plan:plan}))}
     onSaveAIPlan={saveWorkspaceAIPlan}
     aiSavingPlan={workspaceAISavingPlan}
+    recapReflection={recapReflection}
+    setRecapReflection={setRecapReflection}
+    recapChallenge={recapChallenge}
+    setRecapChallenge={setRecapChallenge}
+    recapConfidence={recapConfidence}
+    setRecapConfidence={setRecapConfidence}
+    onGenerateRecap={generateSessionRecap}
+    recapGenerating={recapGenerating}
+    onAddRecapChecklist={addRecapChecklist}
+    recapAddingChecklist={recapAddingChecklist}
   />
 
   <ChatPanel
