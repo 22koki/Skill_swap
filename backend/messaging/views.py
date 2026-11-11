@@ -12,6 +12,7 @@ from .models import Conversation, Message, UserPresence
 from .serializers import ConversationSerializer, MessageSerializer
 from notifications.models import Notification
 from notifications.services import notify
+from users.safety import hidden_user_ids, interaction_block_reason
 
 ALLOWED_CHAT_STATUSES = {"accepted", "completed"}
 
@@ -22,8 +23,11 @@ class ConversationListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        hidden_ids = hidden_user_ids(request.user)
         conversations = Conversation.objects.filter(
             Q(swap__requester=request.user) | Q(swap__recipient=request.user)
+        ).exclude(
+            Q(swap__requester_id__in=hidden_ids) | Q(swap__recipient_id__in=hidden_ids)
         ).select_related(
             "swap", "swap__requester", "swap__recipient",
             "swap__offered_skill", "swap__requested_skill"
@@ -39,6 +43,9 @@ class SwapConversationView(APIView):
             pk=swap_id
         )
         if not user_is_participant(request.user, swap):
+            return None
+        partner = swap.recipient if swap.requester == request.user else swap.requester
+        if interaction_block_reason(request.user, partner):
             return None
         return swap
 
