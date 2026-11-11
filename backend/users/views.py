@@ -7,6 +7,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .models import Profile, AvailabilitySlot
 from .serializers import RegisterSerializer, UserSerializer, AvailabilitySlotSerializer
 from .matching import build_match_data
+from .progression import build_progression
 
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
@@ -217,6 +218,7 @@ class SkillPassportView(APIView):
             "badges": badges,
             "milestones": milestones,
             "recent_journeys": journeys,
+            "progression": build_progression(user),
         })
 
 
@@ -236,3 +238,12 @@ class MyAvailabilityView(APIView):
             for item in serializer.validated_data
         ]
         return Response(AvailabilitySlotSerializer(created, many=True).data)
+
+
+class UserProgressionView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, user_id):
+        from django.contrib.auth.models import User
+        user = get_object_or_404(User, pk=user_id)
+        return Response(build_progression(user))
