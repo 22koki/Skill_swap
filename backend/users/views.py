@@ -8,6 +8,7 @@ from .models import Profile, AvailabilitySlot, UserBlock, SafetyReport, AccountS
 from .serializers import RegisterSerializer, UserSerializer, AvailabilitySlotSerializer, UserBlockSerializer, SafetyReportSerializer, AccountStandingSerializer
 from .matching import build_match_data
 from .progression import build_progression
+from .safety import hidden_user_ids, is_blocked_between
 
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
@@ -52,7 +53,7 @@ class CommunityUsersView(APIView):
         current_user = request.user if request.user.is_authenticated else None
         users = User.objects.all().order_by("date_joined")
         if current_user:
-            users = users.exclude(pk=current_user.pk)
+            users = users.exclude(pk=current_user.pk).exclude(pk__in=hidden_user_ids(current_user))
 
         results = []
         for user in users:
@@ -112,6 +113,8 @@ class SkillPassportView(APIView):
         from reviews.services import reputation_badges
 
         user = get_object_or_404(User, pk=user_id)
+        if request.user.is_authenticated and is_blocked_between(request.user, user):
+            return Response({"detail": "This profile is unavailable."}, status=403)
         profile, _ = Profile.objects.get_or_create(user=user)
 
         skill_links = UserSkill.objects.filter(user=user).select_related("skill", "skill__category")
@@ -257,7 +260,8 @@ class SkillNetworkView(APIView):
         from skills.models import Skill, UserSkill
 
         current_user = request.user if request.user.is_authenticated else None
-        all_users = list(User.objects.all().order_by("date_joined"))
+        hidden_ids = hidden_user_ids(current_user) if current_user else set()
+        all_users = list(User.objects.exclude(pk__in=hidden_ids).order_by("date_joined"))
         skill_links = list(
             UserSkill.objects.select_related(
                 "user", "skill", "skill__category"
@@ -443,6 +447,8 @@ class UniversalSearchView(APIView):
             "skill_links__skill",
             "circle_memberships__circle",
         )
+        if current_user:
+            user_qs = user_qs.exclude(pk=current_user.pk).exclude(pk__in=hidden_user_ids(current_user))
 
         if query:
             user_qs = user_qs.filter(
