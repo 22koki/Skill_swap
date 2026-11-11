@@ -8,6 +8,13 @@ class SessionWorkspace(models.Model):
     lesson_plan = models.TextField(blank=True)
     shared_notes = models.TextField(blank=True)
     progress_percentage = models.PositiveSmallIntegerField(default=0)
+    ai_plan = models.JSONField(default=dict, blank=True)
+    ai_plan_source = models.CharField(max_length=20, blank=True)
+    ai_goal = models.CharField(max_length=500, blank=True)
+    ai_learner_level = models.CharField(max_length=40, blank=True)
+    ai_learning_style = models.CharField(max_length=40, blank=True)
+    ai_session_count = models.PositiveSmallIntegerField(default=3)
+    ai_plan_updated_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
