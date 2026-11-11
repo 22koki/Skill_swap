@@ -137,6 +137,17 @@ export default function App(){
   return ()=>clearTimeout(id);
  },[universalSearchQuery,universalSearchOpen]);
 
+ useEffect(()=>{
+  const onKey=e=>{
+   if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="k"){
+    e.preventDefault();
+    openUniversalSearch();
+   }
+  };
+  window.addEventListener("keydown",onKey);
+  return ()=>window.removeEventListener("keydown",onKey);
+ },[]);
+
  async function refreshAccessToken(){
   const refresh=localStorage.getItem("skillswap_refresh");
   if(!refresh) return "";
