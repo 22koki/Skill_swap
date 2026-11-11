@@ -175,6 +175,7 @@ export default function BookingsPanel({ bookings, currentUser, onAction, onMessa
                 </div>
 
                 <div className="completed-booking-actions">
+                  <button className="outline recap-open-button" onClick={()=>onWorkspace(booking.id)}>✦ AI Recap</button>
                   {booking.review_status?.reviewed
                     ? <span className="reviewed-chip">✓ Reviewed</span>
                     : <button className="primary review-now-button" onClick={()=>onReview(booking)}>⭐ Leave review</button>}
