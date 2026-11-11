@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getSkillVisual } from "./skillVisuals";
 
 const TYPE_META={
@@ -40,6 +40,7 @@ export default function SkillCircles({
   onScheduleSession,
   onGenerateAIPlan,
   onPassport,
+  focusCircleId,
 }){
   const [view,setView]=useState("browse");
   const [filter,setFilter]=useState("all");
@@ -58,6 +59,12 @@ export default function SkillCircles({
   const [resource,setResource]=useState({title:"",url:"",kind:"link"});
   const [session,setSession]=useState({title:"",starts_at:"",duration_minutes:60,mode:"online",meeting_link:"",location_note:"",notes:""});
   const [planSetup,setPlanSetup]=useState({session_count:4,learner_level:"beginner",learning_style:"project_based",duration_minutes:60,goal:""});
+
+  useEffect(()=>{
+    if(open && activeCircle?.id===focusCircleId && focusCircleId){
+      setView("workspace");
+    }
+  },[open,activeCircle?.id,focusCircleId]);
 
   const filtered=useMemo(()=>{
     if(filter==="all") return circles;
