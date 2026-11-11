@@ -269,6 +269,7 @@ export default function App(){
 
  async function handleUniversalCircle(circle){
   setUniversalSearchOpen(false);
+  setCircleFocusId(circle.id);
   setCirclesOpen(true);
   await loadCircles();
   await openCircle(circle.id);
@@ -285,6 +286,7 @@ export default function App(){
  }
 
  async function openSkillCircles(){
+  setCircleFocusId(null);
   setCirclesOpen(true);
   await loadCircles();
  }
@@ -1745,7 +1747,7 @@ export default function App(){
     user={user}
     activeCircle={activeCircle}
     messages={circleMessages}
-    onClose={()=>setCirclesOpen(false)}
+    onClose={()=>{setCirclesOpen(false);setCircleFocusId(null)}}
     onCreate={createCircle}
     onOpenCircle={openCircle}
     onJoin={joinCircle}
