@@ -56,3 +56,23 @@ class WorkspaceChecklistItem(models.Model):
 
     class Meta:
         ordering = ["created_at"]
+
+
+class SessionRecap(models.Model):
+    workspace = models.ForeignKey(SessionWorkspace, on_delete=models.CASCADE, related_name="recaps")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="skillswap_session_recaps")
+    reflection = models.TextField(blank=True)
+    challenge = models.CharField(max_length=500, blank=True)
+    confidence = models.PositiveSmallIntegerField(default=3)
+    recap = models.JSONField(default=dict, blank=True)
+    source = models.CharField(max_length=20, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["workspace", "user"], name="unique_workspace_user_recap")
+        ]
+
+    def __str__(self):
+        return f"Recap · workspace #{self.workspace_id} · {self.user.username}"
