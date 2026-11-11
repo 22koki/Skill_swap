@@ -411,3 +411,238 @@ class SkillNetworkView(APIView):
                 "learners": len({edge["user_id"] for edge in edges if edge["kind"] == "learn"}),
             },
         })
+
+
+
+class UniversalSearchView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from django.contrib.auth.models import User
+        from django.db.models import Count, Q
+        from skills.models import Skill, UserSkill
+        from circles.models import SkillCircle, CircleMember
+
+        query = str(request.query_params.get("q", "")).strip()
+        needle = query.lower()
+        current_user = request.user if request.user.is_authenticated else None
+
+        def text_score(value, exact=100, starts=82, contains=58):
+            value = str(value or "").strip().lower()
+            if not needle or not value:
+                return 0
+            if value == needle:
+                return exact
+            if value.startswith(needle):
+                return starts
+            if needle in value:
+                return contains
+            return 0
+
+        user_qs = User.objects.select_related("profile").prefetch_related(
+            "skill_links__skill",
+            "circle_memberships__circle",
+        )
+
+        if query:
+            user_qs = user_qs.filter(
+                Q(username__icontains=query)
+                | Q(first_name__icontains=query)
+                | Q(last_name__icontains=query)
+                | Q(profile__bio__icontains=query)
+                | Q(profile__location__icontains=query)
+                | Q(skill_links__skill__name__icontains=query)
+                | Q(skill_links__skill__category__name__icontains=query)
+            ).distinct()
+        else:
+            user_qs = user_qs.order_by("-profile__average_rating", "-profile__completed_swaps", "username")[:10]
+
+        people = []
+        for user in list(user_qs)[:18]:
+            profile, _ = Profile.objects.get_or_create(user=user)
+            links = list(user.skill_links.select_related("skill").all())
+            teach_skills = [
+                {"id": item.skill_id, "name": item.skill.name, "level": item.level}
+                for item in links if item.kind == UserSkill.Kind.TEACH
+            ]
+            learn_skills = [
+                {"id": item.skill_id, "name": item.skill.name, "level": item.level}
+                for item in links if item.kind == UserSkill.Kind.LEARN
+            ]
+            mentor_memberships = [
+                membership for membership in user.circle_memberships.all()
+                if membership.role == CircleMember.Role.MENTOR
+            ]
+            is_mentor = bool(mentor_memberships)
+
+            score = 0
+            if query:
+                full_name = user.get_full_name() or user.username
+                score = max(
+                    text_score(user.username, 120, 98, 74),
+                    text_score(full_name, 118, 96, 72),
+                    text_score(profile.location, 74, 62, 48),
+                    text_score(profile.bio, 68, 58, 44),
+                )
+                for skill in teach_skills:
+                    score = max(score, text_score(skill["name"], 112, 92, 70) + 7)
+                for skill in learn_skills:
+                    score = max(score, text_score(skill["name"], 102, 84, 64))
+                if is_mentor and "mentor".startswith(needle):
+                    score = max(score, 88)
+            else:
+                score = 50 + min(25, int(float(profile.average_rating) * 4)) + min(20, profile.completed_swaps)
+
+            match = None
+            if current_user and current_user.id != user.id:
+                match = build_match_data(current_user, user)
+
+            people.append({
+                "type": "person",
+                "user_id": user.id,
+                "name": user.get_full_name() or user.username,
+                "username": user.username,
+                "avatar_url": profile.avatar_url,
+                "bio": profile.bio,
+                "location": profile.location,
+                "average_rating": float(profile.average_rating),
+                "review_count": profile.review_count,
+                "completed_swaps": profile.completed_swaps,
+                "teach_skills": teach_skills,
+                "learn_skills": learn_skills,
+                "is_mentor": is_mentor,
+                "mentor_circle_count": len(mentor_memberships),
+                "mentor_circles": [
+                    {"id": membership.circle_id, "title": membership.circle.title}
+                    for membership in mentor_memberships[:3]
+                ],
+                "score": score,
+                "match_score": match["score"] if match else None,
+                "match_confidence": match["confidence"] if match else "",
+                "they_teach_me": match["they_teach_me"] if match else [],
+                "i_teach_them": match["i_teach_them"] if match else [],
+                "reasons": match["reasons"] if match else [],
+            })
+
+        people.sort(
+            key=lambda item: (
+                -item["score"],
+                -item["average_rating"],
+                -item["completed_swaps"],
+                item["name"].lower(),
+            )
+        )
+        people = people[:10]
+
+        skill_qs = Skill.objects.select_related("category").annotate(
+            teacher_count=Count("user_links", filter=Q(user_links__kind=UserSkill.Kind.TEACH), distinct=True),
+            learner_count=Count("user_links", filter=Q(user_links__kind=UserSkill.Kind.LEARN), distinct=True),
+        )
+        if query:
+            skill_qs = skill_qs.filter(
+                Q(name__icontains=query)
+                | Q(description__icontains=query)
+                | Q(category__name__icontains=query)
+            )
+        else:
+            skill_qs = skill_qs.order_by("-teacher_count", "-learner_count", "name")[:10]
+
+        skills = []
+        for skill in list(skill_qs)[:14]:
+            score = (
+                max(
+                    text_score(skill.name, 120, 100, 78),
+                    text_score(skill.category.name if skill.category else "", 84, 70, 52),
+                    text_score(skill.description, 68, 58, 42),
+                )
+                if query
+                else 50 + min(40, skill.teacher_count + skill.learner_count)
+            )
+            skills.append({
+                "type": "skill",
+                "id": skill.id,
+                "name": skill.name,
+                "description": skill.description,
+                "category": skill.category.name if skill.category else "Other",
+                "category_icon": skill.category.icon if skill.category else "",
+                "teacher_count": skill.teacher_count,
+                "learner_count": skill.learner_count,
+                "connection_count": skill.teacher_count + skill.learner_count,
+                "score": score,
+            })
+        skills.sort(key=lambda item: (-item["score"], -item["connection_count"], item["name"].lower()))
+        skills = skills[:8]
+
+        circle_qs = SkillCircle.objects.select_related(
+            "primary_skill", "primary_skill__category", "created_by"
+        ).prefetch_related("memberships__user").annotate(
+            member_count_annotated=Count("memberships", distinct=True)
+        )
+        if not current_user:
+            circle_qs = circle_qs.filter(is_public=True)
+
+        if query:
+            circle_qs = circle_qs.filter(
+                Q(title__icontains=query)
+                | Q(description__icontains=query)
+                | Q(goal__icontains=query)
+                | Q(primary_skill__name__icontains=query)
+                | Q(primary_skill__category__name__icontains=query)
+                | Q(circle_type__icontains=query)
+            )
+        else:
+            circle_qs = circle_qs.order_by("-member_count_annotated", "-updated_at")[:10]
+
+        circles = []
+        for circle in list(circle_qs)[:12]:
+            membership = None
+            if current_user:
+                current_membership = circle.memberships.filter(user=current_user).first()
+                if current_membership:
+                    membership = {"role": current_membership.role}
+
+            score = (
+                max(
+                    text_score(circle.title, 120, 100, 78),
+                    text_score(circle.primary_skill.name if circle.primary_skill else "", 112, 92, 70),
+                    text_score(circle.goal, 78, 64, 48),
+                    text_score(circle.description, 72, 60, 44),
+                    text_score(circle.get_circle_type_display(), 74, 62, 46),
+                )
+                if query
+                else 50 + min(40, circle.member_count_annotated * 3)
+            )
+            circles.append({
+                "type": "circle",
+                "id": circle.id,
+                "title": circle.title,
+                "circle_type": circle.circle_type,
+                "circle_type_label": circle.get_circle_type_display(),
+                "cover_emoji": circle.cover_emoji,
+                "description": circle.description,
+                "goal": circle.goal,
+                "primary_skill_name": circle.primary_skill.name if circle.primary_skill else "",
+                "primary_skill_id": circle.primary_skill_id,
+                "member_count": circle.member_count_annotated,
+                "mentor_count": circle.memberships.filter(role=CircleMember.Role.MENTOR).count(),
+                "membership": membership,
+                "score": score,
+            })
+        circles.sort(key=lambda item: (-item["score"], -item["member_count"], item["title"].lower()))
+        circles = circles[:8]
+
+        mentors = [person for person in people if person["is_mentor"]][:6]
+
+        return Response({
+            "query": query,
+            "people": people,
+            "mentors": mentors,
+            "skills": skills,
+            "circles": circles,
+            "counts": {
+                "people": len(people),
+                "mentors": len(mentors),
+                "skills": len(skills),
+                "circles": len(circles),
+            },
+        })
