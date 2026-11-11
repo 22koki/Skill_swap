@@ -1,6 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
-from .models import Booking
+from .models import Booking, RescheduleRequest
+from .scheduling import evaluate_time
 
 class BookingSerializer(serializers.ModelSerializer):
     partner_name = serializers.SerializerMethodField()
@@ -8,6 +9,7 @@ class BookingSerializer(serializers.ModelSerializer):
     learn_skill_name = serializers.SerializerMethodField()
     teach_skill_name = serializers.SerializerMethodField()
     review_status = serializers.SerializerMethodField()
+    pending_reschedule = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
@@ -15,7 +17,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "id", "swap", "partner_name", "partner_profile",
             "learn_skill_name", "teach_skill_name",
             "starts_at", "duration_minutes", "mode", "meeting_link",
-            "location_note", "note", "status", "review_status", "created_at", "updated_at",
+            "location_note", "note", "status", "review_status", "pending_reschedule", "created_at", "updated_at",
         ]
         read_only_fields = ["status", "created_at", "updated_at"]
 
@@ -68,6 +70,10 @@ class BookingSerializer(serializers.ModelSerializer):
             "reviewed": reviewed,
         }
 
+    def get_pending_reschedule(self, obj):
+        pending = obj.reschedule_requests.filter(status=RescheduleRequest.Status.PENDING).first()
+        return RescheduleRequestSerializer(pending).data if pending else None
+
     def validate(self, attrs):
         request = self.context["request"]
         swap = attrs.get("swap") or getattr(self.instance, "swap", None)
@@ -85,4 +91,41 @@ class BookingSerializer(serializers.ModelSerializer):
         if not self.instance and Booking.objects.filter(swap=swap, status=Booking.Status.SCHEDULED).exists():
             raise serializers.ValidationError("This swap already has an upcoming booking.")
 
+        duration_minutes = attrs.get("duration_minutes") or getattr(self.instance, "duration_minutes", 60)
+        if starts_at:
+            other_user = swap.recipient if swap.requester == request.user else swap.requester
+            evaluation = evaluate_time(
+                request.user,
+                other_user,
+                starts_at,
+                duration_minutes,
+                exclude_booking_id=self.instance.id if self.instance else None,
+            )
+            if not evaluation["valid"]:
+                raise serializers.ValidationError({
+                    "starts_at": evaluation["messages"],
+                    "schedule_check": evaluation,
+                })
+
         return attrs
+
+
+class RescheduleRequestSerializer(serializers.ModelSerializer):
+    requested_by_name = serializers.SerializerMethodField()
+    requested_by_id = serializers.IntegerField(source="requested_by.id", read_only=True)
+
+    class Meta:
+        model = RescheduleRequest
+        fields = [
+            "id", "booking", "requested_by_id", "requested_by_name",
+            "proposed_starts_at", "proposed_duration_minutes", "proposed_mode",
+            "proposed_meeting_link", "proposed_location_note", "note",
+            "status", "created_at", "updated_at",
+        ]
+        read_only_fields = [
+            "id", "booking", "requested_by_id", "requested_by_name",
+            "status", "created_at", "updated_at",
+        ]
+
+    def get_requested_by_name(self, obj):
+        return obj.requested_by.get_full_name() or obj.requested_by.username
