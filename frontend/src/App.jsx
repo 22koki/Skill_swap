@@ -6,6 +6,8 @@ import ChatPanel from "./ChatPanel";
 import WorkspacePanel from "./WorkspacePanel";
 import ReviewModal from "./ReviewModal";
 import SkillPassport from "./SkillPassport";
+import AvailabilityModal from "./AvailabilityModal";
+import SmartMatchCard from "./SmartMatchCard";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -62,6 +64,9 @@ export default function App(){
  const [passportOpen,setPassportOpen]=useState(false);
  const [passport,setPassport]=useState(null);
  const [passportLoading,setPassportLoading]=useState(false);
+ const [availabilityOpen,setAvailabilityOpen]=useState(false);
+ const [availabilitySlots,setAvailabilitySlots]=useState([]);
+ const [availabilitySaving,setAvailabilitySaving]=useState(false);
  const [reviewForm,setReviewForm]=useState({
   overall_rating:5,
   teaching_quality:5,
@@ -78,7 +83,7 @@ export default function App(){
  const learnVisual=getSkillVisual(learn);
 
  useEffect(()=>{ loadCatalog(); loadCommunityUsers(); },[]);
- useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); loadCommunityUsers(); } },[token]);
+ useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); loadAvailability(); loadCommunityUsers(); } },[token]);
 
  async function refreshAccessToken(){
   const refresh=localStorage.getItem("skillswap_refresh");
@@ -132,20 +137,77 @@ export default function App(){
    const res=await fetch(API+"/auth/community/",{headers});
    if(res.ok){
     const data=await res.json();
-    setCommunityUsers(data);
-    if(!searched) setMatches(data.map(person=>({
+    const normalized=data.map(person=>({
       ...person,
-      name:person.name,
-      teaches:person.teach_skills?.map(s=>s.name).join(", ")||"No teaching skills yet",
-      wants:person.learn_skills?.map(s=>s.name).join(", ")||"No learning skills yet",
+      teaches:person.they_teach_me?.length
+        ? person.they_teach_me.map(s=>s.name).join(", ")
+        : person.teach_skills?.map(s=>s.name).join(", ")||"No teaching skills yet",
+      wants:person.i_teach_them?.length
+        ? person.i_teach_them.map(s=>s.name).join(", ")
+        : person.learn_skills?.map(s=>s.name).join(", ")||"No learning skills yet",
       rating:person.average_rating||0,
       swaps:person.completed_swaps||0,
-      score:person.match_score,
-      avatar_url:person.avatar_url,
       preview:false
+    }));
+    setCommunityUsers(normalized);
+    if(!searched) setMatches(normalized);
+   }
+  }catch{}
+ }
+
+ async function loadAvailability(){
+  if(!token && !localStorage.getItem("skillswap_access")) return;
+  try{
+   const res=await api("/auth/availability/");
+   if(res.ok){
+    const data=await res.json();
+    setAvailabilitySlots(data.map(slot=>({
+      ...slot,
+      start_time:String(slot.start_time).slice(0,5),
+      end_time:String(slot.end_time).slice(0,5)
     })));
    }
   }catch{}
+ }
+
+ function openAvailability(){
+  if(!token){
+   setAuthMode("login");
+   setAuthOpen(true);
+   return;
+  }
+  setAvailabilityOpen(true);
+ }
+
+ async function saveAvailability(){
+  setAvailabilitySaving(true);
+  try{
+   const payload=availabilitySlots.map(slot=>({
+    weekday:Number(slot.weekday),
+    start_time:String(slot.start_time).slice(0,5),
+    end_time:String(slot.end_time).slice(0,5)
+   }));
+   const res=await api("/auth/availability/",{
+    method:"PUT",
+    body:JSON.stringify(payload)
+   });
+   const data=await res.json().catch(()=>[]);
+   if(!res.ok){
+    setNotice(data.detail||Object.values(data).flat().join(" ")||"Could not save availability.");
+    return;
+   }
+   setAvailabilitySlots(data.map(slot=>({
+    ...slot,
+    start_time:String(slot.start_time).slice(0,5),
+    end_time:String(slot.end_time).slice(0,5)
+   })));
+   setAvailabilityOpen(false);
+   setNotice("Availability saved · match scores refreshed 📅");
+   await loadCommunityUsers();
+   if(searched && mySkills.length) await findMatches(false);
+  }finally{
+   setAvailabilitySaving(false);
+  }
  }
 
  async function openPassport(userId){
@@ -504,7 +566,11 @@ export default function App(){
  function logout(){
   localStorage.removeItem("skillswap_access");
   localStorage.removeItem("skillswap_refresh");
-  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]); setChatOpen(false); setActiveConversation(null); setChatMessages([]); setWorkspaceOpen(false); setWorkspace(null); setReviewOpen(false); setReviewBooking(null); setPassportOpen(false); setPassport(null); setMatches(communityUsers.map(person=>({...person,name:person.name,teaches:person.teach_skills?.map(s=>s.name).join(", ")||"No teaching skills yet",wants:person.learn_skills?.map(s=>s.name).join(", ")||"No learning skills yet",rating:person.average_rating||0,swaps:person.completed_swaps||0,score:person.match_score,avatar_url:person.avatar_url,preview:false})));
+  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]);
+  setChatOpen(false); setActiveConversation(null); setChatMessages([]);
+  setWorkspaceOpen(false); setWorkspace(null); setReviewOpen(false); setReviewBooking(null);
+  setPassportOpen(false); setPassport(null); setAvailabilityOpen(false); setAvailabilitySlots([]);
+  setSearched(false); setMatches(communityUsers.map(person=>({...person,score:null,confidence:"",breakdown:{},reasons:[],missing:[],suggested_times:[]})));
  }
 
  async function saveProfile(e){
@@ -542,21 +608,11 @@ export default function App(){
   if(res.ok){ setMySkills(prev=>prev.filter(s=>s.id!==id)); setNotice("Skill removed."); }
  }
 
- async function findMatches(){
+ async function findMatches(scroll=true){
   setSearched(true);
-  document.getElementById("discover")?.scrollIntoView({behavior:"smooth"});
+  if(scroll) document.getElementById("discover")?.scrollIntoView({behavior:"smooth"});
   if(!token){
-   setMatches(communityUsers.map(person=>({
-    ...person,
-    name:person.name,
-    teaches:person.teach_skills?.map(s=>s.name).join(", ")||"No teaching skills yet",
-    wants:person.learn_skills?.map(s=>s.name).join(", ")||"No learning skills yet",
-    rating:person.average_rating||0,
-    swaps:person.completed_swaps||0,
-    score:person.match_score,
-    avatar_url:person.avatar_url,
-    preview:false
-   })));
+   setMatches(communityUsers.map(person=>({...person,score:null,confidence:"",breakdown:{},reasons:[],missing:[],suggested_times:[]})));
    setAuthMode("login");
    setAuthOpen(true);
    return;
@@ -570,13 +626,12 @@ export default function App(){
   const res=await api("/skills/matches/");
   if(res.ok){
    const data=await res.json();
-   setMatches(data.map((m,i)=>({
+   setMatches(data.map(m=>({
     ...m,
     teaches:m.they_teach_me.map(x=>x.name).join(", ")||"Partial match",
     wants:m.i_teach_them.map(x=>x.name).join(", ")||"Partial match",
     rating:m.average_rating||0,
     swaps:m.completed_swaps||0,
-    icon:["📸","🎨","🎬","💻","🎸"][i%5],
     preview:false
    })));
    if(!data.length){
@@ -776,6 +831,7 @@ export default function App(){
       <p>{user.profile?.bio||"Tell people what you enjoy teaching and what you want to learn."}</p>
       <div className="profile-actions">
        <button className="outline" onClick={()=>setProfileOpen(true)}>Edit profile</button>
+       <button className="outline" onClick={openAvailability}>📅 Weekly availability</button>
        <button className="outline passport-profile-button" disabled={passportLoading} onClick={()=>openPassport(user.id)}>🛂 View Skill Passport</button>
        <button className="primary" onClick={()=>setSkillsOpen(true)}>Manage my skills</button>
       </div>
@@ -823,47 +879,23 @@ export default function App(){
     <button className="outline" onClick={openSkills}>Explore all skills ↗</button>
    </div>
 
-   {matches.length ? <div className="cards">{matches.map((m,i)=>{
-    const initials=(m.name||m.username||"SS").split(" ").map(x=>x[0]).join("").slice(0,2).toUpperCase();
-    const hasMutual=!!(m.i_teach_them?.length && m.they_teach_me?.length);
-    const hasAnyMatch=(m.score||0)>0;
-    return <article className="card community-person-card glass" key={(m.user_id||m.name)+"-"+i}>
-      <div className="community-card-top">
-        <div className="community-avatar-wrap">
-          {m.avatar_url
-            ? <img className="community-avatar-img" src={m.avatar_url} alt="" />
-            : <div className="community-avatar-fallback">{initials}</div>}
-        </div>
-        <div className="community-card-head">
-          <h3>{m.name}</h3>
-          {m.location && <small>📍 {m.location}</small>}
-        </div>
-        {m.score!==null && m.score!==undefined
-          ? <span className={"community-match-pill "+(m.score>=100?"strong":m.score>0?"partial":"none")}>{m.score}% match</span>
-          : <span className="community-match-pill community">Community</span>}
-      </div>
-
-      <div className="community-skill-block">
-        <span>Can teach</span>
-        <b>{m.teaches}</b>
-      </div>
-      <div className="community-skill-block">
-        <span>Wants to learn</span>
-        <b>{m.wants}</b>
-      </div>
-
-      <div className="community-card-footer">
-        <small>⭐ {Number(m.rating||0).toFixed(1)} · {m.review_count||0} reviews · {m.swaps||0} swaps</small>
-        {user
-          ? hasMutual
-            ? <button className="primary mini" onClick={()=>openProposal(m)}>Propose swap ↗</button>
-            : hasAnyMatch
-              ? <button className="outline mini partial-match-button" onClick={()=>openProposal(m)}>One-way match</button>
-              : <button className="outline mini" onClick={()=>openPassport(m.user_id)}>View passport</button>
-          : <button className="outline mini" onClick={()=>openPassport(m.user_id)}>View passport</button>}
-      </div>
-    </article>
-   })}</div> :
+   {matches.length ? <div className="smart-match-grid">
+    {matches.map(match=><SmartMatchCard
+      key={match.user_id}
+      match={match}
+      user={user}
+      onProposal={openProposal}
+      onPassport={openPassport}
+      onAvailability={openAvailability}
+      onNotice={message=>{
+        if(!user && message.startsWith("Log in")){
+          setAuthMode("login");
+          setAuthOpen(true);
+        }
+        setNotice(message);
+      }}
+    />)}
+   </div> :
    <div className="empty-state glass"><div>🧭</div><h3>No matches yet</h3><p>Add more teach/learn skills to improve your chances.</p><button className="primary" onClick={()=>setSkillsOpen(true)}>Add skills</button></div>}
   </section>
 
@@ -944,6 +976,15 @@ export default function App(){
     onClose={()=>{setScheduleOpen(false);setSelectedSwap(null)}}
     onSubmit={submitBooking}
   />}
+
+  <AvailabilityModal
+    open={availabilityOpen}
+    slots={availabilitySlots}
+    setSlots={setAvailabilitySlots}
+    onClose={()=>setAvailabilityOpen(false)}
+    onSave={saveAvailability}
+    saving={availabilitySaving}
+  />
 
   <SkillPassport
     open={passportOpen}
