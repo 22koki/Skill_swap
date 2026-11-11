@@ -5,6 +5,7 @@ import ScheduleSwapModal from "./ScheduleSwapModal";
 import ChatPanel from "./ChatPanel";
 import WorkspacePanel from "./WorkspacePanel";
 import ReviewModal from "./ReviewModal";
+import SkillPassport from "./SkillPassport";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -58,6 +59,9 @@ export default function App(){
  const [reviewOpen,setReviewOpen]=useState(false);
  const [reviewBooking,setReviewBooking]=useState(null);
  const [reviewSaving,setReviewSaving]=useState(false);
+ const [passportOpen,setPassportOpen]=useState(false);
+ const [passport,setPassport]=useState(null);
+ const [passportLoading,setPassportLoading]=useState(false);
  const [reviewForm,setReviewForm]=useState({
   overall_rating:5,
   teaching_quality:5,
@@ -142,6 +146,24 @@ export default function App(){
     })));
    }
   }catch{}
+ }
+
+ async function openPassport(userId){
+  setPassportLoading(true);
+  try{
+   const res=await api("/auth/passports/"+userId+"/");
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not load Skill Passport.");
+    return;
+   }
+   setPassport(data);
+   setPassportOpen(true);
+  }catch{
+   setNotice("Could not load Skill Passport.");
+  }finally{
+   setPassportLoading(false);
+  }
  }
 
  async function loadMe(){
@@ -482,7 +504,7 @@ export default function App(){
  function logout(){
   localStorage.removeItem("skillswap_access");
   localStorage.removeItem("skillswap_refresh");
-  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]); setChatOpen(false); setActiveConversation(null); setChatMessages([]); setWorkspaceOpen(false); setWorkspace(null); setReviewOpen(false); setReviewBooking(null); setMatches(communityUsers.map(person=>({...person,name:person.name,teaches:person.teach_skills?.map(s=>s.name).join(", ")||"No teaching skills yet",wants:person.learn_skills?.map(s=>s.name).join(", ")||"No learning skills yet",rating:person.average_rating||0,swaps:person.completed_swaps||0,score:person.match_score,avatar_url:person.avatar_url,preview:false})));
+  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]); setChatOpen(false); setActiveConversation(null); setChatMessages([]); setWorkspaceOpen(false); setWorkspace(null); setReviewOpen(false); setReviewBooking(null); setPassportOpen(false); setPassport(null); setMatches(communityUsers.map(person=>({...person,name:person.name,teaches:person.teach_skills?.map(s=>s.name).join(", ")||"No teaching skills yet",wants:person.learn_skills?.map(s=>s.name).join(", ")||"No learning skills yet",rating:person.average_rating||0,swaps:person.completed_swaps||0,score:person.match_score,avatar_url:person.avatar_url,preview:false})));
  }
 
  async function saveProfile(e){
@@ -637,6 +659,7 @@ export default function App(){
    <div className="actions">
     {user ? <>
       <button className="ghost" onClick={()=>setProfileOpen(true)}>My profile</button>
+      <button className="ghost passport-nav-button" disabled={passportLoading} onClick={()=>openPassport(user.id)}>Skill Passport</button>
       <span className="welcome">Hi, {user.first_name||user.username}</span>
       <button className="ghost" onClick={logout}>Log out</button>
     </> : <>
@@ -753,6 +776,7 @@ export default function App(){
       <p>{user.profile?.bio||"Tell people what you enjoy teaching and what you want to learn."}</p>
       <div className="profile-actions">
        <button className="outline" onClick={()=>setProfileOpen(true)}>Edit profile</button>
+       <button className="outline passport-profile-button" disabled={passportLoading} onClick={()=>openPassport(user.id)}>🛂 View Skill Passport</button>
        <button className="primary" onClick={()=>setSkillsOpen(true)}>Manage my skills</button>
       </div>
     </div>
@@ -835,8 +859,8 @@ export default function App(){
             ? <button className="primary mini" onClick={()=>openProposal(m)}>Propose swap ↗</button>
             : hasAnyMatch
               ? <button className="outline mini partial-match-button" onClick={()=>openProposal(m)}>One-way match</button>
-              : <button className="outline mini" onClick={()=>setNotice(m.name+" is in the community, but your skills do not overlap yet.")}>View member</button>
-          : <button className="primary mini" onClick={()=>{setAuthMode("login");setAuthOpen(true)}}>Log in to connect</button>}
+              : <button className="outline mini" onClick={()=>openPassport(m.user_id)}>View passport</button>
+          : <button className="outline mini" onClick={()=>openPassport(m.user_id)}>View passport</button>}
       </div>
     </article>
    })}</div> :
@@ -920,6 +944,12 @@ export default function App(){
     onClose={()=>{setScheduleOpen(false);setSelectedSwap(null)}}
     onSubmit={submitBooking}
   />}
+
+  <SkillPassport
+    open={passportOpen}
+    passport={passport}
+    onClose={()=>{setPassportOpen(false);setPassport(null)}}
+  />
 
   <ReviewModal
     booking={reviewOpen ? reviewBooking : null}
