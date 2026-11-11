@@ -2282,3 +2282,42 @@ html{scroll-behavior:smooth}.visual-button{border:0;cursor:pointer}.chip{border:
     min-width:0;
   }
 }
+
+
+/* Navbar dropdown hit-layer fix */
+.nav-refined{
+  position:relative;
+  z-index:10000;
+  overflow:visible;
+  isolation:isolate;
+}
+.nav-refined .brand,
+.nav-refined .nav-main-links,
+.nav-refined .nav-actions{
+  position:relative;
+  z-index:10001;
+}
+.nav-dropdown{
+  position:relative;
+  z-index:10002;
+}
+.nav-dropdown[open]{
+  z-index:10005;
+}
+.nav-dropdown-menu{
+  z-index:10010;
+  pointer-events:auto;
+}
+.nav-dropdown-menu a,
+.nav-dropdown-menu button{
+  position:relative;
+  z-index:10011;
+  pointer-events:auto;
+}
+.hero,
+.match-showcase-hero,
+.visual,
+.msh-chip,
+.msh-profile-wrap{
+  z-index:auto;
+}
