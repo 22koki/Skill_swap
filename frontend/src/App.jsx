@@ -124,6 +124,7 @@ export default function App(){
  const [circlesLoading,setCirclesLoading]=useState(false);
  const [activeCircle,setActiveCircle]=useState(null);
  const [circleMessages,setCircleMessages]=useState([]);
+ const [circleFocusId,setCircleFocusId]=useState(null);
  const [universalSearchOpen,setUniversalSearchOpen]=useState(false);
  const [universalSearchQuery,setUniversalSearchQuery]=useState("");
  const [universalSearchData,setUniversalSearchData]=useState({people:[],skills:[],circles:[],mentors:[],counts:{}});
@@ -954,6 +955,7 @@ export default function App(){
 
  async function openCalendarCircle(circleId){
   setCalendarOpen(false);
+  setCircleFocusId(circleId);
   setCirclesOpen(true);
   await loadCircles();
   await openCircle(circleId);
@@ -1175,7 +1177,7 @@ export default function App(){
   setProgression(null); setProgressionOpen(false); setAchievementUnlock(null);
   setNotificationOpen(false); setNotifications([]); setNotificationUnread(0);
   setNetworkOpen(false); setNetworkData(null);
-  setCirclesOpen(false); setCircles([]); setActiveCircle(null); setCircleMessages([]);
+  setCirclesOpen(false); setCircles([]); setActiveCircle(null); setCircleMessages([]); setCircleFocusId(null);
   setScheduleOpen(false); setSelectedSwap(null); setScheduleSuggestions([]); setScheduleError("");
   setRescheduleOpen(false); setRescheduleBooking(null); setRescheduleSuggestions([]);
   setCalendarOpen(false); setCalendarEvents([]);
@@ -1755,6 +1757,7 @@ export default function App(){
     onScheduleSession={scheduleCircleSession}
     onGenerateAIPlan={generateCircleAIPlan}
     onPassport={openPassport}
+    focusCircleId={circleFocusId}
   />
 
   <SkillNetwork
