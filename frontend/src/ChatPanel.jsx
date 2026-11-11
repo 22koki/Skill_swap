@@ -116,7 +116,7 @@ export default function ChatPanel({
                 )}
                 <div className="chat-bubble-wrap">
                   <div className="chat-bubble">{message.body}</div>
-                  <small>{formatTime(message.created_at)}{mine && message.read_at ? " · Read" : ""}</small>
+                  <small>{formatTime(message.created_at)}{mine ? (message.read_at ? " · ✓✓ Read" : message.delivered_at ? " · ✓✓ Delivered" : " · ✓ Sent") : ""}</small>
                 </div>
               </div>
             );
