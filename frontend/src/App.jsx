@@ -82,6 +82,7 @@ export default function App(){
  const [chatPartnerTyping,setChatPartnerTyping]=useState(false);
  const [chatPartnerOnline,setChatPartnerOnline]=useState(false);
  const [chatPartnerLastSeen,setChatPartnerLastSeen]=useState(null);
+ const [presenceByUser,setPresenceByUser]=useState({});
  const activitySocketRef=useRef(null);
  const chatSocketRef=useRef(null);
  const circleSocketRef=useRef(null);
@@ -188,10 +189,7 @@ export default function App(){
     }
     if(data.event==="presence"&&data.presence){
      const p=data.presence;
-     if(activeConversation?.partner_id===p.user_id){
-      setChatPartnerOnline(!!p.online);
-      setChatPartnerLastSeen(p.last_seen||null);
-     }
+     setPresenceByUser(prev=>({...prev,[p.user_id]:p}));
     }
    };
    socket.onclose=()=>{
@@ -208,6 +206,18 @@ export default function App(){
    activitySocketRef.current=null;
   };
  },[token]);
+
+ useEffect(()=>{
+  if(!activeConversation?.partner_id) return;
+  const presence=presenceByUser[activeConversation.partner_id];
+  if(presence){
+   setChatPartnerOnline(!!presence.online);
+   setChatPartnerLastSeen(presence.last_seen||null);
+  }
+  if(chatOpen&&activitySocketRef.current?.readyState===WebSocket.OPEN){
+   activitySocketRef.current.send(JSON.stringify({event:"presence_query",user_id:activeConversation.partner_id}));
+  }
+ },[activeConversation?.partner_id,chatOpen,presenceByUser]);
 
  useEffect(()=>{
   if(!chatOpen||!activeConversation?.swap||!token) return;
@@ -1346,7 +1356,7 @@ export default function App(){
   localStorage.removeItem("skillswap_access");
   localStorage.removeItem("skillswap_refresh");
   setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]);
-  setChatOpen(false); setActiveConversation(null); setChatMessages([]); setChatPartnerTyping(false); setChatPartnerOnline(false); setChatPartnerLastSeen(null);
+  setChatOpen(false); setActiveConversation(null); setChatMessages([]); setChatPartnerTyping(false); setChatPartnerOnline(false); setChatPartnerLastSeen(null); setPresenceByUser({});
   setWorkspaceOpen(false); setWorkspace(null); setReviewOpen(false); setReviewBooking(null);
   setPassportOpen(false); setPassport(null); setAvailabilityOpen(false); setAvailabilitySlots([]);
   setProgression(null); setProgressionOpen(false); setAchievementUnlock(null);
