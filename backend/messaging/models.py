@@ -25,3 +25,17 @@ class Message(models.Model):
 
     def __str__(self):
         return f"{self.sender}: {self.body[:40]}"
+
+
+class UserPresence(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="realtime_presence",
+    )
+    connection_count = models.PositiveIntegerField(default=0)
+    last_seen = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        state = "online" if self.connection_count else "offline"
+        return f"{self.user.username} · {state}"
