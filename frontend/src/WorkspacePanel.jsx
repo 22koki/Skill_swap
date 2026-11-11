@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { getSkillVisual } from "./skillVisuals";
 import AISessionPlanner from "./AISessionPlanner";
+import SessionRecap from "./SessionRecap";
 
 export default function WorkspacePanel({
   open,
@@ -28,6 +29,16 @@ export default function WorkspacePanel({
   onPlanChange,
   onSaveAIPlan,
   aiSavingPlan,
+  recapReflection,
+  setRecapReflection,
+  recapChallenge,
+  setRecapChallenge,
+  recapConfidence,
+  setRecapConfidence,
+  onGenerateRecap,
+  recapGenerating,
+  onAddRecapChecklist,
+  recapAddingChecklist,
 }){
   const [tab,setTab]=useState("plan");
   if(!open || !workspace) return null;
@@ -41,6 +52,7 @@ export default function WorkspacePanel({
 
   const tabs=[
     ["ai","✦ AI Plan"],
+    ["recap","✦ Recap"],
     ["plan","Plan"],
     ["checklist","Checklist"],
     ["resources","Resources"],
@@ -84,6 +96,22 @@ export default function WorkspacePanel({
         </div>
 
         <div className="workspace-body">
+          {tab==="recap" && (
+            <SessionRecap
+              workspace={workspace}
+              reflection={recapReflection}
+              setReflection={setRecapReflection}
+              challenge={recapChallenge}
+              setChallenge={setRecapChallenge}
+              confidence={recapConfidence}
+              setConfidence={setRecapConfidence}
+              onGenerate={onGenerateRecap}
+              generating={recapGenerating}
+              onAddChecklist={onAddRecapChecklist}
+              addingChecklist={recapAddingChecklist}
+            />
+          )}
+
           {tab==="ai" && (
             <AISessionPlanner
               workspace={workspace}
