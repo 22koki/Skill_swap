@@ -180,8 +180,11 @@ export default function App(){
     try{data=JSON.parse(event.data)}catch{return}
     if(data.event==="notification"&&data.notification){
      const item=data.notification;
-     setNotifications(prev=>[item,...prev.filter(n=>n.id!==item.id)]);
-     if(!item.is_read) setNotificationUnread(prev=>prev+1);
+     setNotifications(prev=>{
+      const exists=prev.some(n=>n.id===item.id);
+      if(!exists&&!item.is_read) setNotificationUnread(count=>count+1);
+      return [item,...prev.filter(n=>n.id!==item.id)];
+     });
      setNotice(item.title+(item.body?" · "+item.body:""));
      loadConversations();
      if(item.action_type==="booking") loadBookings();
@@ -225,78 +228,98 @@ export default function App(){
 
  useEffect(()=>{
   if(!chatOpen||!activeConversation?.swap||!token) return;
-  const access=localStorage.getItem("skillswap_access")||token;
-  const socket=new WebSocket(WS_BASE+"/ws/chat/"+activeConversation.swap+"/?token="+encodeURIComponent(access));
-  chatSocketRef.current=socket;
+  let disposed=false;
+  let retryTimer=null;
   setChatPartnerTyping(false);
 
-  socket.onopen=()=>{
-   socket.send(JSON.stringify({event:"read"}));
-   activitySocketRef.current?.send(JSON.stringify({event:"presence_query",user_id:activeConversation.partner_id}));
-  };
-  socket.onmessage=event=>{
-   let data;
-   try{data=JSON.parse(event.data)}catch{return}
-   if(data.event==="message"&&data.message){
-    setChatMessages(prev=>prev.some(m=>m.id===data.message.id)?prev:[...prev,data.message]);
-    if(data.message.sender!==user?.id){
-     socket.send(JSON.stringify({event:"read"}));
-    }
-    loadConversations();
-   }else if(data.event==="typing"){
-    setChatPartnerTyping(!!data.typing);
-   }else if(data.event==="presence"){
-    setChatPartnerOnline(!!data.online);
-   }else if(data.event==="read"){
-    const ids=new Set(data.message_ids||[]);
-    setChatMessages(prev=>prev.map(m=>ids.has(m.id)?{...m,read_at:data.read_at}:m));
-    loadConversations();
-   }
-  };
-  socket.onclose=()=>{
-   if(chatSocketRef.current===socket) chatSocketRef.current=null;
-  };
+  function connectChat(){
+   if(disposed) return;
+   const access=localStorage.getItem("skillswap_access")||token;
+   const socket=new WebSocket(WS_BASE+"/ws/chat/"+activeConversation.swap+"/?token="+encodeURIComponent(access));
+   chatSocketRef.current=socket;
 
+   socket.onopen=()=>{
+    socket.send(JSON.stringify({event:"read"}));
+    activitySocketRef.current?.send(JSON.stringify({event:"presence_query",user_id:activeConversation.partner_id}));
+   };
+   socket.onmessage=event=>{
+    let data;
+    try{data=JSON.parse(event.data)}catch{return}
+    if(data.event==="message"&&data.message){
+     setChatMessages(prev=>prev.some(m=>m.id===data.message.id)?prev:[...prev,data.message]);
+     if(data.message.sender!==user?.id&&socket.readyState===WebSocket.OPEN){
+      socket.send(JSON.stringify({event:"read"}));
+     }
+     loadConversations();
+    }else if(data.event==="typing"){
+     setChatPartnerTyping(!!data.typing);
+    }else if(data.event==="presence"){
+     setChatPartnerOnline(!!data.online);
+    }else if(data.event==="read"){
+     const ids=new Set(data.message_ids||[]);
+     setChatMessages(prev=>prev.map(m=>ids.has(m.id)?{...m,read_at:data.read_at}:m));
+     loadConversations();
+    }
+   };
+   socket.onclose=()=>{
+    if(chatSocketRef.current===socket) chatSocketRef.current=null;
+    if(!disposed) retryTimer=setTimeout(connectChat,1800);
+   };
+  }
+
+  connectChat();
   return ()=>{
-   socket.close();
-   if(chatSocketRef.current===socket) chatSocketRef.current=null;
+   disposed=true;
+   if(retryTimer) clearTimeout(retryTimer);
+   chatSocketRef.current?.close();
+   chatSocketRef.current=null;
    setChatPartnerTyping(false);
   };
  },[chatOpen,activeConversation?.swap,token]);
 
  useEffect(()=>{
   if(!circlesOpen||!activeCircle?.id||!activeCircle?.membership||!token) return;
-  const access=localStorage.getItem("skillswap_access")||token;
-  const socket=new WebSocket(WS_BASE+"/ws/circles/"+activeCircle.id+"/?token="+encodeURIComponent(access));
-  circleSocketRef.current=socket;
+  let disposed=false;
+  let retryTimer=null;
   setCircleOnlineIds([]);
   setCircleTypingUsers([]);
 
-  socket.onmessage=event=>{
-   let data;
-   try{data=JSON.parse(event.data)}catch{return}
-   if(data.event==="message"&&data.message){
-    setCircleMessages(prev=>prev.some(m=>m.id===data.message.id)?prev:[...prev,data.message]);
-   }else if(data.event==="presence"){
-    setCircleOnlineIds(prev=>{
-     const next=new Set(prev);
-     if(data.online) next.add(data.user_id); else next.delete(data.user_id);
-     return Array.from(next);
-    });
-   }else if(data.event==="typing"){
-    setCircleTypingUsers(prev=>{
-     const others=prev.filter(item=>item.user_id!==data.user_id);
-     return data.typing?[...others,{user_id:data.user_id,name:data.user_name}]:others;
-    });
-   }
-  };
-  socket.onclose=()=>{
-   if(circleSocketRef.current===socket) circleSocketRef.current=null;
-  };
+  function connectCircle(){
+   if(disposed) return;
+   const access=localStorage.getItem("skillswap_access")||token;
+   const socket=new WebSocket(WS_BASE+"/ws/circles/"+activeCircle.id+"/?token="+encodeURIComponent(access));
+   circleSocketRef.current=socket;
 
+   socket.onmessage=event=>{
+    let data;
+    try{data=JSON.parse(event.data)}catch{return}
+    if(data.event==="message"&&data.message){
+     setCircleMessages(prev=>prev.some(m=>m.id===data.message.id)?prev:[...prev,data.message]);
+    }else if(data.event==="presence"){
+     setCircleOnlineIds(prev=>{
+      const next=new Set(prev);
+      if(data.online) next.add(data.user_id); else next.delete(data.user_id);
+      return Array.from(next);
+     });
+    }else if(data.event==="typing"){
+     setCircleTypingUsers(prev=>{
+      const others=prev.filter(item=>item.user_id!==data.user_id);
+      return data.typing?[...others,{user_id:data.user_id,name:data.user_name}]:others;
+     });
+    }
+   };
+   socket.onclose=()=>{
+    if(circleSocketRef.current===socket) circleSocketRef.current=null;
+    if(!disposed) retryTimer=setTimeout(connectCircle,1800);
+   };
+  }
+
+  connectCircle();
   return ()=>{
-   socket.close();
-   if(circleSocketRef.current===socket) circleSocketRef.current=null;
+   disposed=true;
+   if(retryTimer) clearTimeout(retryTimer);
+   circleSocketRef.current?.close();
+   circleSocketRef.current=null;
    setCircleOnlineIds([]);
    setCircleTypingUsers([]);
   };
