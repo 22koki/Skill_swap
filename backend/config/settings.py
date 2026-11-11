@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "workspaces",
     "reviews",
     "notifications",
+    "circles",
 ]
 
 MIDDLEWARE = [
