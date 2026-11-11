@@ -247,3 +247,167 @@ class UserProgressionView(APIView):
         from django.contrib.auth.models import User
         user = get_object_or_404(User, pk=user_id)
         return Response(build_progression(user))
+
+
+class SkillNetworkView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from django.contrib.auth.models import User
+        from skills.models import Skill, UserSkill
+
+        current_user = request.user if request.user.is_authenticated else None
+        all_users = list(User.objects.all().order_by("date_joined"))
+        skill_links = list(
+            UserSkill.objects.select_related(
+                "user", "skill", "skill__category"
+            ).order_by("skill__name", "user__username")
+        )
+
+        links_by_user = {}
+        links_by_skill = {}
+        for link in skill_links:
+            links_by_user.setdefault(link.user_id, []).append(link)
+            links_by_skill.setdefault(link.skill_id, []).append(link)
+
+        users = []
+        for user in all_users:
+            profile, _ = Profile.objects.get_or_create(user=user)
+            links = links_by_user.get(user.id, [])
+            progression = build_progression(user)
+            match = None
+            if current_user and user.id != current_user.id:
+                match = build_match_data(current_user, user)
+
+            users.append({
+                "id": user.id,
+                "name": user.get_full_name() or user.username,
+                "username": user.username,
+                "avatar_url": profile.avatar_url,
+                "location": profile.location,
+                "average_rating": float(profile.average_rating),
+                "review_count": profile.review_count,
+                "completed_swaps": profile.completed_swaps,
+                "is_me": bool(current_user and user.id == current_user.id),
+                "level": progression["level"],
+                "xp": progression["xp"],
+                "current_streak": progression["current_streak"],
+                "teach_skills": [
+                    {
+                        "id": link.skill_id,
+                        "name": link.skill.name,
+                        "level": link.level,
+                    }
+                    for link in links if link.kind == UserSkill.Kind.TEACH
+                ],
+                "learn_skills": [
+                    {
+                        "id": link.skill_id,
+                        "name": link.skill.name,
+                        "level": link.level,
+                    }
+                    for link in links if link.kind == UserSkill.Kind.LEARN
+                ],
+                "match": match,
+            })
+
+        skills = []
+        for skill in Skill.objects.select_related("category").all():
+            links = links_by_skill.get(skill.id, [])
+            teacher_count = sum(1 for link in links if link.kind == UserSkill.Kind.TEACH)
+            learner_count = sum(1 for link in links if link.kind == UserSkill.Kind.LEARN)
+            if not links:
+                continue
+            skills.append({
+                "id": skill.id,
+                "name": skill.name,
+                "category": skill.category.name if skill.category else "Other",
+                "category_icon": skill.category.icon if skill.category else "",
+                "teacher_count": teacher_count,
+                "learner_count": learner_count,
+                "connection_count": len(links),
+            })
+
+        edges = [
+            {
+                "id": f"{link.user_id}-{link.skill_id}-{link.kind}",
+                "user_id": link.user_id,
+                "skill_id": link.skill_id,
+                "kind": link.kind,
+                "level": link.level,
+            }
+            for link in skill_links
+        ]
+
+        my_path = []
+        if current_user:
+            mine = links_by_user.get(current_user.id, [])
+            my_learn_ids = [
+                link.skill_id for link in mine if link.kind == UserSkill.Kind.LEARN
+            ]
+            for wanted_skill_id in my_learn_ids:
+                wanted_skill = next((skill for skill in skills if skill["id"] == wanted_skill_id), None)
+                if not wanted_skill:
+                    continue
+
+                teacher_links = [
+                    link for link in links_by_skill.get(wanted_skill_id, [])
+                    if link.kind == UserSkill.Kind.TEACH and link.user_id != current_user.id
+                ]
+                if not teacher_links:
+                    continue
+
+                teacher = teacher_links[0].user
+                teacher_wants = [
+                    link for link in links_by_user.get(teacher.id, [])
+                    if link.kind == UserSkill.Kind.LEARN
+                ]
+
+                bridge = None
+                for teacher_want in teacher_wants:
+                    next_teacher = next(
+                        (
+                            link.user for link in links_by_skill.get(teacher_want.skill_id, [])
+                            if link.kind == UserSkill.Kind.TEACH
+                            and link.user_id not in {current_user.id, teacher.id}
+                        ),
+                        None,
+                    )
+                    if next_teacher:
+                        bridge = {
+                            "skill": {
+                                "id": teacher_want.skill_id,
+                                "name": teacher_want.skill.name,
+                            },
+                            "user": {
+                                "id": next_teacher.id,
+                                "name": next_teacher.get_full_name() or next_teacher.username,
+                            },
+                        }
+                        break
+
+                my_path = [
+                    {"type": "user", "id": current_user.id, "label": "You"},
+                    {"type": "skill", "id": wanted_skill_id, "label": wanted_skill["name"]},
+                    {"type": "user", "id": teacher.id, "label": teacher.get_full_name() or teacher.username},
+                ]
+                if bridge:
+                    my_path.extend([
+                        {"type": "skill", "id": bridge["skill"]["id"], "label": bridge["skill"]["name"]},
+                        {"type": "user", "id": bridge["user"]["id"], "label": bridge["user"]["name"]},
+                    ])
+                break
+
+        return Response({
+            "users": users,
+            "skills": skills,
+            "edges": edges,
+            "my_path": my_path,
+            "stats": {
+                "people": len(users),
+                "skills": len(skills),
+                "connections": len(edges),
+                "teachers": len({edge["user_id"] for edge in edges if edge["kind"] == "teach"}),
+                "learners": len({edge["user_id"] for edge in edges if edge["kind"] == "learn"}),
+            },
+        })
