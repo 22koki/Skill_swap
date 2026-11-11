@@ -8,6 +8,8 @@ from rest_framework.views import APIView
 from swaps.models import Swap
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
+from notifications.models import Notification
+from notifications.services import notify
 
 ALLOWED_CHAT_STATUSES = {"accepted", "completed"}
 
@@ -72,4 +74,15 @@ class SwapConversationView(APIView):
         conversation, _ = Conversation.objects.get_or_create(swap=swap)
         message = Message.objects.create(conversation=conversation, sender=request.user, body=body)
         conversation.save(update_fields=["updated_at"])
+        recipient = swap.recipient if swap.requester == request.user else swap.requester
+        notify(
+            recipient,
+            Notification.Kind.MESSAGE,
+            f"New message from {request.user.get_full_name() or request.user.username}",
+            body[:120],
+            actor=request.user,
+            action_type="message",
+            target_id=swap.id,
+            dedupe_key=f"message:{message.id}",
+        )
         return Response(MessageSerializer(message).data, status=status.HTTP_201_CREATED)
