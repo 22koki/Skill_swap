@@ -8,6 +8,8 @@ import ReviewModal from "./ReviewModal";
 import SkillPassport from "./SkillPassport";
 import AvailabilityModal from "./AvailabilityModal";
 import SmartMatchCard from "./SmartMatchCard";
+import ProgressionPanel from "./ProgressionPanel";
+import AchievementUnlock from "./AchievementUnlock";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -67,6 +69,9 @@ export default function App(){
  const [availabilityOpen,setAvailabilityOpen]=useState(false);
  const [availabilitySlots,setAvailabilitySlots]=useState([]);
  const [availabilitySaving,setAvailabilitySaving]=useState(false);
+ const [progression,setProgression]=useState(null);
+ const [progressionOpen,setProgressionOpen]=useState(false);
+ const [achievementUnlock,setAchievementUnlock]=useState(null);
  const [reviewForm,setReviewForm]=useState({
   overall_rating:5,
   teaching_quality:5,
@@ -83,7 +88,7 @@ export default function App(){
  const learnVisual=getSkillVisual(learn);
 
  useEffect(()=>{ loadCatalog(); loadCommunityUsers(); },[]);
- useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); loadAvailability(); loadCommunityUsers(); } },[token]);
+ useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); loadAvailability(); loadCommunityUsers(); loadProgression(false); } },[token]);
 
  async function refreshAccessToken(){
   const refresh=localStorage.getItem("skillswap_refresh");
@@ -151,6 +156,42 @@ export default function App(){
     }));
     setCommunityUsers(normalized);
     if(!searched) setMatches(normalized);
+   }
+  }catch{}
+ }
+
+ async function loadProgression(checkUnlock=false){
+  const currentUser=user;
+  const userId=currentUser?.id;
+  if(!userId && !localStorage.getItem("skillswap_access")) return;
+  try{
+   let resolvedId=userId;
+   if(!resolvedId){
+    const meRes=await api("/auth/me/");
+    if(!meRes.ok) return;
+    const meData=await meRes.json();
+    resolvedId=meData.id;
+   }
+
+   const res=await api("/auth/progression/"+resolvedId+"/");
+   if(!res.ok) return;
+   const data=await res.json();
+   setProgression(data);
+
+   const storageKey="skillswap_seen_achievements_"+resolvedId;
+   const raw=localStorage.getItem(storageKey);
+   const unlockedKeys=(data.unlocked||[]).map(item=>item.key);
+
+   if(raw===null){
+    localStorage.setItem(storageKey,JSON.stringify(unlockedKeys));
+   }else if(checkUnlock){
+    let seen=[];
+    try{ seen=JSON.parse(raw)||[]; }catch{}
+    const newlyUnlocked=(data.unlocked||[]).filter(item=>!seen.includes(item.key));
+    if(newlyUnlocked.length){
+     setAchievementUnlock(newlyUnlocked[0]);
+     localStorage.setItem(storageKey,JSON.stringify([...new Set([...seen,...unlockedKeys])]));
+    }
    }
   }catch{}
  }
@@ -502,6 +543,7 @@ export default function App(){
    setNotice("Review submitted ⭐");
    await loadMe();
    await loadSwaps();
+   await loadProgression(true);
   }finally{
    setReviewSaving(false);
   }
@@ -515,6 +557,7 @@ export default function App(){
    if(action==="complete"){
     await loadSwaps();
     await loadMe();
+    await loadProgression(true);
     setNotice("Session completed 🎉");
     openReview(updated);
    }else{
@@ -570,6 +613,7 @@ export default function App(){
   setChatOpen(false); setActiveConversation(null); setChatMessages([]);
   setWorkspaceOpen(false); setWorkspace(null); setReviewOpen(false); setReviewBooking(null);
   setPassportOpen(false); setPassport(null); setAvailabilityOpen(false); setAvailabilitySlots([]);
+  setProgression(null); setProgressionOpen(false); setAchievementUnlock(null);
   setSearched(false); setMatches(communityUsers.map(person=>({...person,score:null,confidence:"",breakdown:{},reasons:[],missing:[],suggested_times:[]})));
  }
 
@@ -832,11 +876,24 @@ export default function App(){
       <div className="profile-actions">
        <button className="outline" onClick={()=>setProfileOpen(true)}>Edit profile</button>
        <button className="outline" onClick={openAvailability}>📅 Weekly availability</button>
+       <button className="outline progression-profile-button" onClick={()=>setProgressionOpen(true)} disabled={!progression}>
+        {progression ? progression.level.icon+" Level "+progression.level.level+" · "+progression.level.name : "🏆 Progression"}
+       </button>
        <button className="outline passport-profile-button" disabled={passportLoading} onClick={()=>openPassport(user.id)}>🛂 View Skill Passport</button>
        <button className="primary" onClick={()=>setSkillsOpen(true)}>Manage my skills</button>
       </div>
     </div>
     <div className="profile-reputation-wrap">
+      {progression && <button className="profile-level-card" onClick={()=>setProgressionOpen(true)}>
+        <div className="profile-level-icon">{progression.level.icon}</div>
+        <div className="profile-level-copy">
+          <small>LEVEL {progression.level.level}</small>
+          <b>{progression.level.name}</b>
+          <div className="profile-level-track"><i style={{width:progression.level_progress+"%"}}></i></div>
+          <span>{progression.xp.toLocaleString()} XP · 🔥 {progression.current_streak} week streak</span>
+        </div>
+        <em>→</em>
+      </button>}
       <div className="profile-meta">
         <span>📍 {user.profile?.location||"Location not set"}</span>
         <span>🔄 {user.profile?.session_preference||"both"}</span>
@@ -976,6 +1033,17 @@ export default function App(){
     onClose={()=>{setScheduleOpen(false);setSelectedSwap(null)}}
     onSubmit={submitBooking}
   />}
+
+  <ProgressionPanel
+    open={progressionOpen}
+    progression={progression}
+    onClose={()=>setProgressionOpen(false)}
+  />
+
+  <AchievementUnlock
+    achievement={achievementUnlock}
+    onClose={()=>setAchievementUnlock(null)}
+  />
 
   <AvailabilityModal
     open={availabilityOpen}
