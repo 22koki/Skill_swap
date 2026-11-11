@@ -4,6 +4,7 @@ import BookingsPanel from "./BookingsPanel";
 import ScheduleSwapModal from "./ScheduleSwapModal";
 import ChatPanel from "./ChatPanel";
 import WorkspacePanel from "./WorkspacePanel";
+import ReviewModal from "./ReviewModal";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -59,6 +60,18 @@ export default function App(){
  const [workspaceResourceForm,setWorkspaceResourceForm]=useState({title:"",url:"",kind:"link"});
  const [workspaceChecklistText,setWorkspaceChecklistText]=useState("");
  const [workspaceSaving,setWorkspaceSaving]=useState(false);
+ const [reviewOpen,setReviewOpen]=useState(false);
+ const [reviewBooking,setReviewBooking]=useState(null);
+ const [reviewSaving,setReviewSaving]=useState(false);
+ const [reviewForm,setReviewForm]=useState({
+  overall_rating:5,
+  teaching_quality:5,
+  communication:5,
+  reliability:5,
+  friendliness:5,
+  would_swap_again:true,
+  comment:""
+ });
 
  const teachSkills=useMemo(()=>mySkills.filter(s=>s.kind==="teach"),[mySkills]);
  const learnSkills=useMemo(()=>mySkills.filter(s=>s.kind==="learn"),[mySkills]);
@@ -351,6 +364,47 @@ export default function App(){
   }
  }
 
+ function openReview(booking){
+  setReviewBooking(booking);
+  setReviewForm({
+   overall_rating:5,
+   teaching_quality:5,
+   communication:5,
+   reliability:5,
+   friendliness:5,
+   would_swap_again:true,
+   comment:""
+  });
+  setReviewOpen(true);
+ }
+
+ async function submitReview(){
+  if(!reviewBooking) return;
+  setReviewSaving(true);
+  try{
+   const res=await api("/reviews/",{
+    method:"POST",
+    body:JSON.stringify({booking:reviewBooking.id,...reviewForm})
+   });
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||Object.values(data).flat().join(" ")||"Could not submit review.");
+    return;
+   }
+   setBookings(prev=>prev.map(b=>b.id===reviewBooking.id
+    ? {...b,review_status:{can_review:false,reviewed:true}}
+    : b
+   ));
+   setReviewOpen(false);
+   setReviewBooking(null);
+   setNotice("Review submitted ⭐");
+   await loadMe();
+   await loadSwaps();
+  }finally{
+   setReviewSaving(false);
+  }
+ }
+
  async function handleBookingAction(id, action){
   const res=await api("/bookings/"+id+"/"+action+"/",{method:"POST"});
   if(res.ok){
@@ -358,7 +412,9 @@ export default function App(){
    setBookings(prev=>prev.map(b=>b.id===id?updated:b));
    if(action==="complete"){
     await loadSwaps();
+    await loadMe();
     setNotice("Session completed 🎉");
+    openReview(updated);
    }else{
     setNotice("Booking cancelled.");
    }
@@ -408,7 +464,7 @@ export default function App(){
  function logout(){
   localStorage.removeItem("skillswap_access");
   localStorage.removeItem("skillswap_refresh");
-  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]); setChatOpen(false); setActiveConversation(null); setChatMessages([]); setWorkspaceOpen(false); setWorkspace(null); setMatches(previewMatches);
+  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]); setChatOpen(false); setActiveConversation(null); setChatMessages([]); setWorkspaceOpen(false); setWorkspace(null); setReviewOpen(false); setReviewBooking(null); setMatches(previewMatches);
  }
 
  async function saveProfile(e){
@@ -699,7 +755,7 @@ export default function App(){
 
   {user && <RequestsPanel swaps={swaps} bookings={bookings} currentUserId={user.id} currentUser={user} onAction={handleSwapAction} onSchedule={openSchedule} onMessage={openChat} />}
 
-  {user && <BookingsPanel bookings={bookings} currentUser={user} onAction={handleBookingAction} onMessage={openChat} onWorkspace={openWorkspace} />}
+  {user && <BookingsPanel bookings={bookings} currentUser={user} onAction={handleBookingAction} onMessage={openChat} onWorkspace={openWorkspace} onReview={openReview} />}
 
   <section id="how" className="how glass">
    <div className="eyebrow">THREE SIMPLE MOVES</div><h2>Your knowledge is your currency.</h2>
@@ -774,6 +830,15 @@ export default function App(){
     onClose={()=>{setScheduleOpen(false);setSelectedSwap(null)}}
     onSubmit={submitBooking}
   />}
+
+  <ReviewModal
+    booking={reviewOpen ? reviewBooking : null}
+    form={reviewForm}
+    setForm={setReviewForm}
+    onClose={()=>{setReviewOpen(false);setReviewBooking(null)}}
+    onSubmit={submitReview}
+    saving={reviewSaving}
+  />
 
   <WorkspacePanel
     open={workspaceOpen}
