@@ -47,3 +47,112 @@ class AvailabilitySlot(models.Model):
 
     def __str__(self):
         return f"{self.user.username} · {self.weekday} · {self.start_time}-{self.end_time}"
+
+
+
+class UserBlock(models.Model):
+    blocker = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="blocks_created",
+    )
+    blocked = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="blocks_received",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["blocker", "blocked"], name="unique_user_block")
+        ]
+
+    def __str__(self):
+        return f"{self.blocker} blocked {self.blocked}"
+
+
+class AccountStanding(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="account_standing",
+    )
+    warning_count = models.PositiveIntegerField(default=0)
+    restricted_until = models.DateTimeField(null=True, blank=True)
+    suspended = models.BooleanField(default=False)
+    note = models.TextField(blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user} · {'suspended' if self.suspended else 'active'}"
+
+
+class SafetyReport(models.Model):
+    class TargetType(models.TextChoices):
+        USER = "user", "User"
+        MESSAGE = "message", "Message"
+        CIRCLE = "circle", "Circle"
+        CIRCLE_MESSAGE = "circle_message", "Circle message"
+
+    class Reason(models.TextChoices):
+        HARASSMENT = "harassment", "Harassment"
+        SPAM = "spam", "Spam"
+        SCAM = "scam", "Scam or fraud"
+        INAPPROPRIATE = "inappropriate", "Inappropriate behaviour"
+        FAKE_PROFILE = "fake_profile", "Fake profile"
+        OTHER = "other", "Other"
+
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        REVIEWING = "reviewing", "Reviewing"
+        RESOLVED = "resolved", "Resolved"
+        DISMISSED = "dismissed", "Dismissed"
+
+    class ResolutionAction(models.TextChoices):
+        NONE = "none", "None"
+        WARN = "warn", "Warn"
+        RESTRICT = "restrict", "Restrict"
+        SUSPEND = "suspend", "Suspend"
+
+    reporter = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="safety_reports_made",
+    )
+    reported_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="safety_reports_received",
+    )
+    target_type = models.CharField(max_length=24, choices=TargetType.choices)
+    target_id = models.PositiveIntegerField(null=True, blank=True)
+    reason = models.CharField(max_length=24, choices=Reason.choices)
+    details = models.TextField(blank=True)
+    evidence = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN)
+    resolution_action = models.CharField(
+        max_length=16,
+        choices=ResolutionAction.choices,
+        default=ResolutionAction.NONE,
+    )
+    resolution_note = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="safety_reports_reviewed",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Report #{self.id} · {self.target_type} · {self.reason}"
