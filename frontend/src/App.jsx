@@ -1010,7 +1010,13 @@ export default function App(){
        <span>{conversations.reduce((sum,c)=>sum+(c.unread_count||0),0)}</span>}
     </button>}
 
-    <details className="nav-dropdown nav-explore">
+    <details className="nav-dropdown nav-explore" onToggle={e=>{
+      if(e.currentTarget.open){
+       document.querySelectorAll(".nav-dropdown[open]").forEach(item=>{
+        if(item!==e.currentTarget) item.removeAttribute("open");
+       });
+      }
+     }}>
       <summary>Explore <span>⌄</span></summary>
       <div className="nav-dropdown-menu nav-explore-menu">
        <div className="nav-dropdown-label">EXPLORE SKILLSWAP</div>
@@ -1037,7 +1043,13 @@ export default function App(){
        {notificationUnread>0 && <b>{notificationUnread>99?"99+":notificationUnread}</b>}
       </button>
 
-      <details className="nav-dropdown nav-account">
+      <details className="nav-dropdown nav-account" onToggle={e=>{
+       if(e.currentTarget.open){
+        document.querySelectorAll(".nav-dropdown[open]").forEach(item=>{
+         if(item!==e.currentTarget) item.removeAttribute("open");
+        });
+       }
+      }}>
        <summary>
         <span className="nav-account-avatar">
          {user.profile?.avatar_url
