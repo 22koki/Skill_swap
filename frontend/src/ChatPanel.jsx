@@ -16,6 +16,10 @@ export default function ChatPanel({
   onClose,
   onSend,
   onRefresh,
+  onTyping,
+  partnerTyping=false,
+  partnerOnline=false,
+  partnerLastSeen=null,
   sending,
   booking,
 }){
@@ -29,7 +33,7 @@ export default function ChatPanel({
 
   useEffect(()=>{
     if(!open || !onRefresh) return;
-    const id=setInterval(onRefresh,5000);
+    const id=setInterval(onRefresh,20000);
     return ()=>clearInterval(id);
   },[open,onRefresh]);
 
@@ -56,7 +60,14 @@ export default function ChatPanel({
             <div>
               <div className="chat-kicker">SkillSwap chat</div>
               <h3>{conversation.partner_name}</h3>
-              <p>{conversation.partner_location || "SkillSwap partner"}</p>
+              <p className={"chat-presence "+(partnerOnline?"online":"offline")}>
+                <i></i>
+                {partnerOnline
+                  ? "Online now"
+                  : partnerLastSeen
+                    ? "Last seen "+new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(partnerLastSeen))
+                    : (conversation.partner_location || "SkillSwap partner")}
+              </p>
             </div>
           </div>
           <button className="chat-close" onClick={onClose}>×</button>
@@ -110,6 +121,7 @@ export default function ChatPanel({
               </div>
             );
           })}
+          {partnerTyping&&<div className="chat-typing-indicator"><span></span><span></span><span></span><b>{conversation.partner_name} is typing…</b></div>}
           <div ref={endRef}></div>
         </div>
 
@@ -119,7 +131,7 @@ export default function ChatPanel({
             maxLength="2000"
             placeholder={"Message "+conversation.partner_name+"…"}
             value={draft}
-            onChange={e=>setDraft(e.target.value)}
+            onChange={e=>{setDraft(e.target.value);onTyping?.(!!e.target.value.trim());}}
             onKeyDown={e=>{
               if(e.key==="Enter" && !e.shiftKey){
                 e.preventDefault();
