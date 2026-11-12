@@ -41,7 +41,6 @@ export default function SmartMatchCard({match,user,onProposal,onPassport,onAvail
           </div>
         </button>
 
-        {user&&<BookmarkButton type="user" id={match.user_id} compact {...bookmarkProps}/>}
         {score!==null && score!==undefined ? (
           <div className={"smart-score "+(score>=85?"excellent":score>=60?"good":"possible")}>
             <div className="smart-score-ring" style={{"--score":score}}>
@@ -124,6 +123,7 @@ export default function SmartMatchCard({match,user,onProposal,onPassport,onAvail
         </div>
 
         <div className="smart-match-actions">
+          {user&&<BookmarkButton type="user" id={match.user_id} compact {...bookmarkProps}/>}
           <button className="outline mini" onClick={()=>onPassport(match.user_id)}>View passport</button>
           {user ? (
             hasMutual
