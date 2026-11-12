@@ -195,7 +195,7 @@ export default function UniversalSearch({
                         );
                       })}
                     </div>
-                  )
+                  )}
                 </section>
               ))}
             </>
