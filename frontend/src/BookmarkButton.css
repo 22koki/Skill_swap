@@ -1,0 +1,13 @@
+.quick-bookmark{display:inline-flex;align-items:center;position:relative;gap:3px;flex-shrink:0;z-index:3}
+.quick-bookmark-toggle,.quick-bookmark-folder{border:1px solid #e8dcfc;border-radius:999px;background:#fff;color:#6a3bd4;cursor:pointer;min-height:34px;font-size:20px;font-weight:700;padding:4px 11px;box-shadow:0 4px 12px rgba(74,38,146,.07)}
+.quick-bookmark-toggle{display:inline-flex;gap:5px;align-items:center;justify-content:center}
+.quick-bookmark-toggle span{font-size:12px;font-weight:800}
+.quick-bookmark-toggle.is-saved{color:#d54a8a;background:#fff1f7;border-color:#f6d1e2}
+.quick-bookmark-toggle:hover{transform:translateY(-1px);box-shadow:0 7px 18px rgba(74,38,146,.13)}
+.quick-bookmark-toggle:disabled,.quick-bookmark-folder:disabled{opacity:.55;cursor:wait}
+.quick-bookmark-folder{font-size:14px;padding:6px 9px}
+.quick-bookmark-popover{position:absolute;right:0;top:calc(100% + 6px);min-width:185px;padding:12px;background:#fff;border:1px solid #e7dff2;border-radius:16px;box-shadow:0 16px 42px rgba(29,18,59,.19);display:grid;gap:6px;color:#32234a;z-index:70}
+.quick-bookmark-popover strong{font-size:12px;margin-bottom:4px}
+.quick-bookmark-choice,.quick-bookmark-done{border:0;text-align:left;background:#f6f2ff;color:#47316d;padding:9px;border-radius:9px;font-size:12px;cursor:pointer}
+.quick-bookmark-choice:hover{background:#ece2ff}.quick-bookmark-done{text-align:center;color:#fff;background:#6a3bd4}
+.quick-bookmark-error{position:absolute;top:100%;right:0;min-width:160px;color:#a12d4e;background:#fff4f5;padding:8px;border-radius:9px;font-size:11px}
