@@ -1,5 +1,6 @@
 import { getSkillVisual } from "./skillVisuals";
 import BookmarkButton from "./BookmarkButton";
+import "./PassportChallenges.css";
 
 function formatMemberSince(value){
   if(!value) return "";
@@ -111,6 +112,26 @@ export default function SkillPassport({open,passport,currentUserId,onBlock,onRep
                 </div>
               ))}
             </div>}
+          </section>}
+
+          {passport.progression && <section className="passport-section passport-challenge-section">
+            <div className="passport-section-head">
+              <div>
+                <div className="passport-kicker">COMMUNITY CHALLENGES</div>
+                <h3>Consistency & challenge rewards</h3>
+              </div>
+              <span className="passport-challenge-xp">✦ {passport.progression.challenge_xp||0} XP</span>
+            </div>
+            <div className="passport-challenge-stats">
+              <div><span>🔥</span><strong>{passport.progression.challenge_streak?.current||0}</strong><small>Day learning streak</small></div>
+              <div><span>⚡</span><strong>{passport.progression.challenge_streak?.best||0}</strong><small>Longest day streak</small></div>
+              <div><span>🏆</span><strong>{passport.progression.completed_challenges||0}</strong><small>Challenges completed</small></div>
+            </div>
+            <div className="passport-challenge-badges">
+              {passport.progression.challenge_badges?.length
+                ? passport.progression.challenge_badges.map((badge,i)=><span className="passport-challenge-badge" key={badge.name||i}>{badge.icon} {badge.name}</span>)
+                : <p>Join a SkillSwap challenge and complete its milestones to unlock your first challenge badge.</p>}
+            </div>
           </section>}
 
           <div className="passport-section">
