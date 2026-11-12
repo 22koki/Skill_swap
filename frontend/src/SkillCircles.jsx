@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getSkillVisual } from "./skillVisuals";
+import BookmarkButton from "./BookmarkButton";
 
 const TYPE_META={
   learn:["🎓","Learn a Skill"],
@@ -47,6 +48,7 @@ export default function SkillCircles({
   onDeleteMessage,
   onReport,
   focusCircleId,
+  bookmarkProps,
 }){
   const [view,setView]=useState("browse");
   const [filter,setFilter]=useState("all");
@@ -222,6 +224,7 @@ export default function SkillCircles({
                         </div>
 
                         <div className="circle-featured-actions">
+                          {user&&<BookmarkButton type="circle" id={item.id} compact {...bookmarkProps}/>}
                           <button className="circle-featured-open" onClick={async()=>{await onOpenCircle(item.id);setView("workspace");}}>Open circle <span>→</span></button>
                           {item.membership
                             ? <span className={"circle-featured-role "+item.membership.role}>{item.membership.role==="mentor"?"🎓 Mentor":"🌱 Learner"}</span>
@@ -276,6 +279,7 @@ export default function SkillCircles({
                               <div className="circle-progress-track"><i style={{width:(item.progress_percentage||0)+"%"}}></i></div>
                             </div>
                             <div className="circle-discover-actions">
+                              {user&&<BookmarkButton type="circle" id={item.id} compact {...bookmarkProps}/>}
                               <button className="primary" onClick={async()=>{await onOpenCircle(item.id);setView("workspace");}}>Open circle →</button>
                               {!item.membership&&user&&<button className="circle-mini-join" onClick={()=>onJoin(item.id,"learner")}>＋</button>}
                             </div>

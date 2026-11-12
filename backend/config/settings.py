@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "reviews",
     "notifications",
     "circles",
+    "bookmarks",
 ]
 
 MIDDLEWARE = [

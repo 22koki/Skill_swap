@@ -19,6 +19,7 @@ import UniversalSearch from "./UniversalSearch";
 import ReportModal from "./ReportModal";
 import SafetyCenter from "./SafetyCenter";
 import HomeDashboard from "./HomeDashboard";
+import SavedPanel from "./SavedPanel";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -132,6 +133,9 @@ export default function App(){
  const [networkOpen,setNetworkOpen]=useState(false);
  const [networkData,setNetworkData]=useState(null);
  const [networkLoading,setNetworkLoading]=useState(false);
+ const [savedOpen,setSavedOpen]=useState(false);
+ const [bookmarks,setBookmarks]=useState([]);
+ const [bookmarkCollections,setBookmarkCollections]=useState([]);
  const [circlesOpen,setCirclesOpen]=useState(false);
  const [circles,setCircles]=useState([]);
  const [circlesLoading,setCirclesLoading]=useState(false);
@@ -170,7 +174,7 @@ export default function App(){
  const learnVisual=getSkillVisual(learn);
 
  useEffect(()=>{ loadCatalog(); loadCommunityUsers(); },[]);
- useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); loadAvailability(); loadCommunityUsers(); loadProgression(false); loadNotifications(); loadNotificationPreferences(); loadDashboard(); } },[token]);
+ useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); loadAvailability(); loadCommunityUsers(); loadProgression(false); loadNotifications(); loadNotificationPreferences(); loadDashboard(); loadBookmarks(); } },[token]);
  useEffect(()=>{
   if(!token) return;
   const id=setInterval(()=>loadNotifications(false),60000);
@@ -399,6 +403,41 @@ export default function App(){
   return res;
  }
 
+ async function loadBookmarks(){
+  if(!localStorage.getItem("skillswap_access")&&!token)return;
+  try{
+   const [saved,folders]=await Promise.all([api("/bookmarks/"),api("/bookmarks/collections/")]);
+   if(saved.ok&&folders.ok){
+    setBookmarks(await saved.json());
+    setBookmarkCollections(await folders.json());
+   }
+  }catch(err){console.error("Could not load bookmarks",err)}
+ }
+ async function bookmarkAction(method,path,body){
+  const res=await api(path,{method,...(body?{body:JSON.stringify(body)}:{})});
+  if(!res.ok){
+   const data=await res.json().catch(()=>({}));
+   throw new Error(data.detail||data.non_field_errors?.[0]||"Bookmark action failed.");
+  }
+  await loadBookmarks();
+ }
+ async function saveBookmark(target_type,target_id){
+  if(!user){setAuthMode("login");setAuthOpen(true);return}
+  await bookmarkAction("POST","/bookmarks/",{target_type,target_id});
+  setNotice("Added to your saved library ♥");
+ }
+ async function removeBookmark(id){
+  await bookmarkAction("DELETE","/bookmarks/"+id+"/");
+  setNotice("Bookmark removed.");
+ }
+ async function assignBookmark(item,collectionId){
+  const ids=item.collection_ids.includes(collectionId)
+   ?item.collection_ids.filter(id=>id!==collectionId)
+   :[...item.collection_ids,collectionId];
+  await bookmarkAction("PATCH","/bookmarks/"+item.id+"/",{collection_ids:ids});
+ }
+ const bookmarkProps={bookmarks,collections:bookmarkCollections,onSave:saveBookmark,onRemove:removeBookmark,onAssign:assignBookmark};
+ 
  async function loadCatalog(){
   try{
    const res=await fetch(API+"/skills/");
@@ -1526,6 +1565,7 @@ export default function App(){
   setProgression(null); setProgressionOpen(false); setAchievementUnlock(null);
   setNotificationOpen(false); setNotifications([]); setNotificationUnread(0);
   setNetworkOpen(false); setNetworkData(null);
+  setSavedOpen(false); setBookmarks([]); setBookmarkCollections([]);
   setCirclesOpen(false); setCircles([]); setActiveCircle(null); setCircleMessages([]); setCircleFocusId(null);
   setScheduleOpen(false); setSelectedSwap(null); setScheduleSuggestions([]); setScheduleError("");
   setRescheduleOpen(false); setRescheduleBooking(null); setRescheduleSuggestions([]);
@@ -1715,6 +1755,7 @@ export default function App(){
       <span>⌕</span><b>Search</b><kbd>⌘ K</kbd>
     </button>
     {user ? <>
+      <button className="ghost" onClick={()=>setSavedOpen(true)} aria-label="Saved bookmarks and collections">♡ Saved</button>
       <button className="notification-bell nav-icon-button" onClick={()=>{setNotificationOpen(true);loadNotifications();}} aria-label="Notifications">
        <span className="notification-bell-icon">🔔</span>
        {notificationUnread>0 && <b>{notificationUnread>99?"99+":notificationUnread}</b>}
@@ -1970,6 +2011,7 @@ export default function App(){
       onProposal={openProposal}
       onPassport={openPassport}
       onAvailability={openAvailability}
+      bookmarkProps={bookmarkProps}
       onNotice={message=>{
         if(!user && message.startsWith("Log in")){
           setAuthMode("login");
@@ -2094,6 +2136,8 @@ export default function App(){
     onOpenCircle={openCalendarCircle}
   />
 
+  <SavedPanel open={savedOpen} onClose={()=>{setSavedOpen(false);loadBookmarks()}} token={token} catalog={catalog} people={communityUsers} circles={circles} />
+
   <UniversalSearch
     open={universalSearchOpen}
     query={universalSearchQuery}
@@ -2106,6 +2150,7 @@ export default function App(){
     onCircle={handleUniversalCircle}
     onPropose={match=>{setUniversalSearchOpen(false);openProposal(match);}}
     currentUser={user}
+    bookmarkProps={bookmarkProps}
   />
 
   <SkillCircles
@@ -2135,6 +2180,7 @@ export default function App(){
     onDeleteMessage={deleteCircleMessage}
     onReport={openReport}
     focusCircleId={circleFocusId}
+    bookmarkProps={bookmarkProps}
   />
 
   <SkillNetwork
@@ -2185,6 +2231,7 @@ export default function App(){
     passport={passport}
     currentUserId={user?.id}
     onBlock={blockUser}
+    bookmarkProps={bookmarkProps}
     onReport={openReport}
     onClose={()=>{setPassportOpen(false);setPassport(null)}}
   />

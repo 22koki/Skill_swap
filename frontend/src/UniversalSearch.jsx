@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getSkillVisual } from "./skillVisuals";
+import BookmarkButton from "./BookmarkButton";
 
 const FILTERS=[
   ["all","All"],
@@ -25,6 +26,7 @@ export default function UniversalSearch({
   onCircle,
   onPropose,
   currentUser,
+  bookmarkProps,
 }){
   const inputRef=useRef(null);
   const [filter,setFilter]=useState("all");
@@ -143,6 +145,7 @@ export default function UniversalSearch({
                           </button>
 
                           <div className="universal-result-actions">
+                            {currentUser&&currentUser.id!==person.user_id&&<BookmarkButton type="user" id={person.user_id} compact {...bookmarkProps}/>}
                             <button className="outline" onClick={()=>onPerson(person)}>View passport</button>
                             {currentUser && person.they_teach_me?.length>0 && person.i_teach_them?.length>0 &&
                               <button className="primary" onClick={()=>onPropose({
@@ -159,7 +162,7 @@ export default function UniversalSearch({
                       {items.map(skill=>{
                         const visual=getSkillVisual(skill.name);
                         return (
-                          <button className="universal-skill-card" key={skill.id} onClick={()=>onSkill(skill)}>
+                          <div className="quick-save-card" key={skill.id}><button className="universal-skill-card" onClick={()=>onSkill(skill)}>
                             <div className={"universal-skill-icon "+visual.className}>{visual.icon}</div>
                             <div>
                               <small>{skill.category}</small>
@@ -167,7 +170,7 @@ export default function UniversalSearch({
                               <p>{skill.teacher_count} teachers · {skill.learner_count} learners</p>
                             </div>
                             <span>→</span>
-                          </button>
+                          </button>{currentUser&&<BookmarkButton type="skill" id={skill.id} compact {...bookmarkProps}/>}</div>
                         );
                       })}
                     </div>
@@ -176,7 +179,7 @@ export default function UniversalSearch({
                       {items.map(circle=>{
                         const visual=getSkillVisual(circle.primary_skill_name||circle.title);
                         return (
-                          <button className="universal-circle-card" key={circle.id} onClick={()=>onCircle(circle)}>
+                          <div className="quick-save-card" key={circle.id}><button className="universal-circle-card" onClick={()=>onCircle(circle)}>
                             <div className="universal-circle-cover">
                               <div className={"universal-circle-icon "+visual.className}>{circle.cover_emoji||visual.icon}</div>
                               {circle.membership&&<span>{circle.membership.role==="mentor"?"🎓 Mentor":"🌱 Member"}</span>}
@@ -188,11 +191,11 @@ export default function UniversalSearch({
                               <div><span>👥 {circle.member_count}</span><span>🎓 {circle.mentor_count}</span></div>
                             </div>
                             <em>→</em>
-                          </button>
+                          </button>{currentUser&&<BookmarkButton type="circle" id={circle.id} compact {...bookmarkProps}/>}</div>
                         );
                       })}
                     </div>
-                  )}
+                  )
                 </section>
               ))}
             </>
