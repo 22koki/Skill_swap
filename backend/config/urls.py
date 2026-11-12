@@ -24,4 +24,5 @@ urlpatterns = [
     path("api/bookmarks/", include("bookmarks.urls")),
     path("api/goals/", include("goals.urls")),
     path("api/community/", include("community.urls")),
+    path("api/challenges/", include("challenges.urls")),
 ]
