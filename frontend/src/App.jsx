@@ -1808,6 +1808,18 @@ export default function App(){
          <span className="nav-menu-icon">🛂</span>
          <span><b>Skill Passport</b><small>Your learning identity</small></span>
         </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setCommunityOpen(true);}}>
+         <span className="nav-menu-icon">💜</span>
+         <span><b>Community</b><small>Share progress and celebrate learning</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setGoalsOpen(true);}}>
+         <span className="nav-menu-icon">🎯</span>
+         <span><b>Learning Goals</b><small>Your goals and milestones</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setSavedOpen(true);}}>
+         <span className="nav-menu-icon">♡</span>
+         <span><b>Saved</b><small>Bookmarks and collections</small></span>
+        </button>
         <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openSafetyCenter();}}>
          <span className="nav-menu-icon">🛡</span>
          <span><b>Safety Center</b><small>Blocks, reports and account standing</small></span>
