@@ -1757,14 +1757,56 @@ export default function App(){
    </div>
 
    <div className="actions nav-actions">
+    <details className="nav-dropdown nav-compact-menu" onToggle={e=>{
+     if(e.currentTarget.open){
+      document.querySelectorAll(".nav-dropdown[open]").forEach(item=>{
+       if(item!==e.currentTarget)item.removeAttribute("open");
+      });
+     }
+    }}>
+     <summary className="nav-compact-trigger"><span>☰</span><b>Menu</b></summary>
+     <div className="nav-dropdown-menu nav-compact-dropdown">
+      <div className="nav-dropdown-label">NAVIGATION</div>
+      <a href="#discover" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><span className="nav-menu-icon">✦</span><span><b>Discover</b><small>Find new skill matches</small></span></a>
+      {user&&<a href="#requests" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><span className="nav-menu-icon">↗</span><span><b>Requests</b><small>Manage your swaps</small></span></a>}
+      {user&&<a href="#bookings" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><span className="nav-menu-icon">📅</span><span><b>Bookings</b><small>Your scheduled sessions</small></span></a>}
+      {user&&<button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");if(conversations[0])openChat(conversations[0].swap);else setNotice("Messages will appear after accepting a SkillSwap.");}}><span className="nav-menu-icon">💬</span><span><b>Messages</b><small>Chat with your partners</small></span></button>}
+      {user&&<button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setGoalsOpen(true);}}><span className="nav-menu-icon">🎯</span><span><b>Goals</b><small>Learning milestones</small></span></button>}
+      {user&&<button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setChallengesOpen(true);}}><span className="nav-menu-icon">🏆</span><span><b>Challenges</b><small>Learning streaks</small></span></button>}
+      {user&&<button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setCommunityOpen(true);}}><span className="nav-menu-icon">💜</span><span><b>Community</b><small>Social learning feed</small></span></button>}
+      {user&&<button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setSavedOpen(true);}}><span className="nav-menu-icon">♡</span><span><b>Saved</b><small>Your saved items</small></span></button>}
+      <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openSkillCircles();}}><span className="nav-menu-icon">👥</span><span><b>Skill Circles</b><small>Group learning</small></span></button>
+      <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openSkillNetwork();}}><span className="nav-menu-icon">🕸</span><span><b>Skill Network</b><small>Explore connections</small></span></button>
+     </div>
+    </details>
     <button className="nav-search-button" onClick={openUniversalSearch} aria-label="Search SkillSwap">
       <span>⌕</span><b>Search</b><kbd>⌘ K</kbd>
     </button>
     {user ? <>
-      <button className="ghost" onClick={()=>setSavedOpen(true)} aria-label="Saved bookmarks and collections">♡ Saved</button>
-      <button className="ghost" onClick={()=>setGoalsOpen(true)} aria-label="Personal learning goals">🎯 Goals</button>
-      <button className="ghost" onClick={()=>setCommunityOpen(true)} aria-label="Community activity feed">💜 Community</button>
-      <button className="ghost" onClick={()=>setChallengesOpen(true)} aria-label="Learning challenges">🏆 Challenges</button>
+      <details className="nav-dropdown nav-learning" onToggle={e=>{
+       if(e.currentTarget.open){
+        document.querySelectorAll(".nav-dropdown[open]").forEach(item=>{
+         if(item!==e.currentTarget)item.removeAttribute("open");
+        });
+       }
+      }}>
+       <summary className="nav-learning-trigger"><span>✦</span> My Learning <span className="nav-chevron">⌄</span></summary>
+       <div className="nav-dropdown-menu nav-learning-menu">
+        <div className="nav-dropdown-label">YOUR LEARNING SPACE</div>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setGoalsOpen(true);}}>
+         <span className="nav-menu-icon">🎯</span><span><b>Learning Goals</b><small>Milestones and progress</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setChallengesOpen(true);}}>
+         <span className="nav-menu-icon">🏆</span><span><b>Challenges</b><small>Streaks, rewards and badges</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setCommunityOpen(true);}}>
+         <span className="nav-menu-icon">💜</span><span><b>Community Feed</b><small>Updates and shared projects</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setSavedOpen(true);}}>
+         <span className="nav-menu-icon">♡</span><span><b>Saved Library</b><small>Bookmarks and collections</small></span>
+        </button>
+       </div>
+      </details>
       <button className="notification-bell nav-icon-button" onClick={()=>{setNotificationOpen(true);loadNotifications();}} aria-label="Notifications">
        <span className="notification-bell-icon">🔔</span>
        {notificationUnread>0 && <b>{notificationUnread>99?"99+":notificationUnread}</b>}
