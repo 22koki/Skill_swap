@@ -22,4 +22,5 @@ urlpatterns = [
     path("api/notifications/", include("notifications.urls")),
     path("api/circles/", include("circles.urls")),
     path("api/bookmarks/", include("bookmarks.urls")),
+    path("api/goals/", include("goals.urls")),
 ]
