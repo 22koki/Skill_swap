@@ -73,10 +73,6 @@ def _achievement(key, icon, title, description, current, target, xp, category):
         "target": target,
         "progress": progress,
         "xp": xp,
-        "challenge_xp": challenge_data["earned_xp"],
-        "challenge_badges": challenge_data["badges"],
-        "challenge_streak": challenge_data["streak"],
-        "completed_challenges": challenge_data["completed_challenges"],
         "unlocked": unlocked,
     }
 
@@ -171,6 +167,10 @@ def build_progression(user):
 
     return {
         "xp": xp,
+        "challenge_xp": challenge_data["earned_xp"],
+        "challenge_badges": challenge_data["badges"],
+        "challenge_streak": challenge_data["streak"],
+        "completed_challenges": challenge_data["completed_challenges"],
         "level": level,
         "next_level": next_level,
         "level_progress": max(0, min(100, level_progress)),
