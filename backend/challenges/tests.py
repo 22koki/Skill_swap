@@ -48,6 +48,26 @@ class ChallengeTests(TestCase):
         self.assertEqual(dates["current"], 1)
         self.assertEqual(dates["active_days"], 1)
 
+    def test_completed_challenge_unlocks_badge_once(self):
+        self.client.post("/api/challenges/milestone-momentum/join/")
+        goal = LearningGoal.objects.create(owner=self.user, title="My roadmap")
+        for number in range(5):
+            Milestone.objects.create(goal=goal, title=f"Step {number}", is_done=True, completed_at=timezone.now())
+        result = self.client.get("/api/challenges/").data
+        item = next(x for x in result["challenges"] if x["slug"] == "milestone-momentum")
+        self.assertEqual(item["state"], "completed")
+        self.assertEqual(item["progress"], 5)
+        self.assertEqual(result["completed_challenges"], 1)
+        self.assertEqual(result["earned_xp"], 150)
+        self.assertEqual(result["badges"][0]["name"], "Goal Getter")
+
+    def test_inactive_challenge_has_zero_progress(self):
+        Post.objects.create(author=self.user, kind="project", body="Before signing up")
+        data = self.client.get("/api/challenges/").data
+        item = next(x for x in data["challenges"] if x["slug"] == "project-showcase")
+        self.assertEqual(item["state"], "available")
+        self.assertEqual(item["progress"], 0)
+
     def test_auth_and_unknown_challenge(self):
         self.assertEqual(self.client.post("/api/challenges/not-a-challenge/join/").status_code, 404)
         self.client.force_authenticate(user=None)
