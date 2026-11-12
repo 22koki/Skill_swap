@@ -31,6 +31,47 @@ class LearningGoalTests(TestCase):
         self.assertEqual(self.client.patch(f"/api/goals/{foreign.id}/milestones/{milestone.id}/", {"is_done": True}, format="json").status_code, 404)
         self.assertEqual(self.client.post(f"/api/goals/{foreign.id}/milestones/", {"title": "Intrusion"}, format="json").status_code, 404)
 
+    def test_completed_milestone_timestamp_is_stable_on_rename_and_undo(self):
+        goal = LearningGoal.objects.create(owner=self.owner, title="Practice")
+        first = self.client.post(
+            f"/api/goals/{goal.id}/milestones/",
+            {"title": "First task", "is_done": True}, format="json"
+        )
+        self.assertEqual(first.status_code, 201)
+        milestone_id = first.data["id"]
+        milestone = Milestone.objects.get(pk=milestone_id)
+        created_at = milestone.completed_at
+        self.assertIsNotNone(created_at)
+
+        response = self.client.patch(
+            f"/api/goals/{goal.id}/milestones/{milestone_id}/",
+            {"title": "Renamed task"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        milestone.refresh_from_db()
+        self.assertEqual(milestone.completed_at, created_at)
+
+        response = self.client.patch(
+            f"/api/goals/{goal.id}/milestones/{milestone_id}/",
+            {"is_done": False}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        milestone.refresh_from_db()
+        self.assertIsNone(milestone.completed_at)
+        self.assertEqual(self.client.get(f"/api/goals/{goal.id}/").data["progress"], 0)
+
+    def test_completed_milestone_counts_toward_joined_challenge_only(self):
+        self.client.post("/api/challenges/milestone-momentum/join/")
+        goal = LearningGoal.objects.create(owner=self.owner, title="Build project")
+        response = self.client.post(
+            f"/api/goals/{goal.id}/milestones/",
+            {"title": "Create a component", "is_done": True}, format="json"
+        )
+        self.assertEqual(response.status_code, 201)
+        data = self.client.get("/api/challenges/").data
+        target = next(x for x in data["challenges"] if x["slug"] == "milestone-momentum")
+        self.assertEqual(target["progress"], 1)
+
     def test_authentication_required(self):
         self.client.force_authenticate(user=None)
         self.assertIn(self.client.get("/api/goals/").status_code, (401, 403))
