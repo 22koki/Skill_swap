@@ -21,6 +21,7 @@ import SafetyCenter from "./SafetyCenter";
 import HomeDashboard from "./HomeDashboard";
 import SavedPanel from "./SavedPanel";
 import LearningGoals from "./LearningGoals";
+import CommunityFeed from "./CommunityFeed";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -136,6 +137,7 @@ export default function App(){
  const [networkLoading,setNetworkLoading]=useState(false);
  const [savedOpen,setSavedOpen]=useState(false);
  const [goalsOpen,setGoalsOpen]=useState(false);
+ const [communityOpen,setCommunityOpen]=useState(false);
  const [bookmarks,setBookmarks]=useState([]);
  const [bookmarkCollections,setBookmarkCollections]=useState([]);
  const [circlesOpen,setCirclesOpen]=useState(false);
@@ -1567,7 +1569,7 @@ export default function App(){
   setProgression(null); setProgressionOpen(false); setAchievementUnlock(null);
   setNotificationOpen(false); setNotifications([]); setNotificationUnread(0);
   setNetworkOpen(false); setNetworkData(null);
-  setSavedOpen(false); setGoalsOpen(false); setBookmarks([]); setBookmarkCollections([]);
+  setSavedOpen(false); setGoalsOpen(false); setCommunityOpen(false); setBookmarks([]); setBookmarkCollections([]);
   setCirclesOpen(false); setCircles([]); setActiveCircle(null); setCircleMessages([]); setCircleFocusId(null);
   setScheduleOpen(false); setSelectedSwap(null); setScheduleSuggestions([]); setScheduleError("");
   setRescheduleOpen(false); setRescheduleBooking(null); setRescheduleSuggestions([]);
@@ -1759,6 +1761,7 @@ export default function App(){
     {user ? <>
       <button className="ghost" onClick={()=>setSavedOpen(true)} aria-label="Saved bookmarks and collections">♡ Saved</button>
       <button className="ghost" onClick={()=>setGoalsOpen(true)} aria-label="Personal learning goals">🎯 Goals</button>
+      <button className="ghost" onClick={()=>setCommunityOpen(true)} aria-label="Community activity feed">💜 Community</button>
       <button className="notification-bell nav-icon-button" onClick={()=>{setNotificationOpen(true);loadNotifications();}} aria-label="Notifications">
        <span className="notification-bell-icon">🔔</span>
        {notificationUnread>0 && <b>{notificationUnread>99?"99+":notificationUnread}</b>}
@@ -2138,6 +2141,8 @@ export default function App(){
     onOpenBooking={openCalendarBooking}
     onOpenCircle={openCalendarCircle}
   />
+
+  <CommunityFeed open={communityOpen} onClose={()=>setCommunityOpen(false)} api={api} user={user} />
 
   <LearningGoals open={goalsOpen} onClose={()=>setGoalsOpen(false)} api={api} catalog={catalog} />
 
