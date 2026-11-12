@@ -20,6 +20,12 @@ class CollectionSerializer(serializers.ModelSerializer):
         value = value.strip()
         if not value:
             raise serializers.ValidationError("Collection name cannot be blank.")
+        owner = self.context["request"].user
+        existing = Collection.objects.filter(owner=owner, name__iexact=value)
+        if self.instance:
+            existing = existing.exclude(pk=self.instance.pk)
+        if existing.exists():
+            raise serializers.ValidationError("You already have a collection with this name.")
         return value
 
 
