@@ -25,7 +25,7 @@ import CommunityFeed from "./CommunityFeed";
 import LearningChallenges from "./LearningChallenges";
 import { getSkillVisual } from "./skillVisuals";
 
-const API = "http://127.0.0.1:8000/api";
+const API = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 const WS_BASE = API.replace(/^http/,"ws").replace(/\/api$/,"");
 export default function App(){
  const [teach,setTeach]=useState("Python");
