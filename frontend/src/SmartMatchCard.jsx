@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { getSkillVisual } from "./skillVisuals";
+import BookmarkButton from "./BookmarkButton";
 
 const BREAKDOWN_LABELS={
   skills:"Skill compatibility",
@@ -9,7 +10,7 @@ const BREAKDOWN_LABELS={
   experience:"Experience",
 };
 
-export default function SmartMatchCard({match,user,onProposal,onPassport,onAvailability,onNotice}){
+export default function SmartMatchCard({match,user,onProposal,onPassport,onAvailability,onNotice,bookmarkProps}){
   const [expanded,setExpanded]=useState(false);
   const initials=(match.name||match.username||"SS").split(" ").map(x=>x[0]).join("").slice(0,2).toUpperCase();
   const hasMutual=!!(match.i_teach_them?.length && match.they_teach_me?.length);
@@ -40,6 +41,7 @@ export default function SmartMatchCard({match,user,onProposal,onPassport,onAvail
           </div>
         </button>
 
+        {user&&<BookmarkButton type="user" id={match.user_id} compact {...bookmarkProps}/>}
         {score!==null && score!==undefined ? (
           <div className={"smart-score "+(score>=85?"excellent":score>=60?"good":"possible")}>
             <div className="smart-score-ring" style={{"--score":score}}>
