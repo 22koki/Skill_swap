@@ -87,7 +87,7 @@ class ChallengeTests(TestCase):
         self.assertEqual(first["challenge_badges"], [{"name": "Goal Getter", "icon": "🎯"}])
         self.assertEqual(len([a for a in first["unlocked"] if a["key"] == "challenge-milestone-momentum"]), 1)
         self.assertEqual(
-            self.client.get(f"/api/auth/users/{self.user.id}/passport/").status_code,
+            self.client.get(f"/api/auth/passports/{self.user.id}/").status_code,
             200,
         )
 
