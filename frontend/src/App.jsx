@@ -19,6 +19,7 @@ import UniversalSearch from "./UniversalSearch";
 import ReportModal from "./ReportModal";
 import SafetyCenter from "./SafetyCenter";
 import HomeDashboard from "./HomeDashboard";
+import SavedPanel from "./SavedPanel";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -132,6 +133,7 @@ export default function App(){
  const [networkOpen,setNetworkOpen]=useState(false);
  const [networkData,setNetworkData]=useState(null);
  const [networkLoading,setNetworkLoading]=useState(false);
+ const [savedOpen,setSavedOpen]=useState(false);
  const [circlesOpen,setCirclesOpen]=useState(false);
  const [circles,setCircles]=useState([]);
  const [circlesLoading,setCirclesLoading]=useState(false);
@@ -1526,6 +1528,7 @@ export default function App(){
   setProgression(null); setProgressionOpen(false); setAchievementUnlock(null);
   setNotificationOpen(false); setNotifications([]); setNotificationUnread(0);
   setNetworkOpen(false); setNetworkData(null);
+  setSavedOpen(false);
   setCirclesOpen(false); setCircles([]); setActiveCircle(null); setCircleMessages([]); setCircleFocusId(null);
   setScheduleOpen(false); setSelectedSwap(null); setScheduleSuggestions([]); setScheduleError("");
   setRescheduleOpen(false); setRescheduleBooking(null); setRescheduleSuggestions([]);
@@ -1715,6 +1718,7 @@ export default function App(){
       <span>⌕</span><b>Search</b><kbd>⌘ K</kbd>
     </button>
     {user ? <>
+      <button className="ghost" onClick={()=>setSavedOpen(true)} aria-label="Saved bookmarks and collections">♡ Saved</button>
       <button className="notification-bell nav-icon-button" onClick={()=>{setNotificationOpen(true);loadNotifications();}} aria-label="Notifications">
        <span className="notification-bell-icon">🔔</span>
        {notificationUnread>0 && <b>{notificationUnread>99?"99+":notificationUnread}</b>}
@@ -2093,6 +2097,8 @@ export default function App(){
     onOpenBooking={openCalendarBooking}
     onOpenCircle={openCalendarCircle}
   />
+
+  <SavedPanel open={savedOpen} onClose={()=>setSavedOpen(false)} token={token} catalog={catalog} people={communityUsers} circles={circles} />
 
   <UniversalSearch
     open={universalSearchOpen}
