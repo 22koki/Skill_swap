@@ -35,8 +35,11 @@ class MilestoneListView(generics.ListCreateAPIView):
         return Milestone.objects.filter(goal__owner=self.request.user, goal_id=self.kwargs["goal_id"])
 
     def perform_create(self, serializer):
-        goal = generics.get_object_or_404(LearningGoal, pk=self.kwargs["goal_id"], owner=self.request.user)
-        serializer.save(goal=goal)
+        goal = generics.get_object_or_404(
+            LearningGoal, pk=self.kwargs["goal_id"], owner=self.request.user
+        )
+        completed = serializer.validated_data.get("is_done", False)
+        serializer.save(goal=goal, completed_at=timezone.now() if completed else None)
 
 
 class MilestoneDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -48,6 +51,13 @@ class MilestoneDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Milestone.objects.filter(goal__owner=self.request.user, goal_id=self.kwargs["goal_id"])
 
     def perform_update(self, serializer):
-        milestone = serializer.save()
-        milestone.completed_at = timezone.now() if milestone.is_done else None
-        milestone.save(update_fields=["completed_at"])
+        previous_done = serializer.instance.is_done
+        completed = serializer.validated_data.get("is_done", previous_done)
+        if completed and not previous_done:
+            # Preserve the original completion time when editing a completed step.
+            serializer.save(completed_at=timezone.now())
+        elif not completed:
+            # Undoing a step must remove its streak/challenge contribution.
+            serializer.save(completed_at=None)
+        else:
+            serializer.save()
