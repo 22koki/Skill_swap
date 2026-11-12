@@ -69,6 +69,15 @@ class ChallengeTests(TestCase):
         self.assertEqual(item["state"], "available")
         self.assertEqual(item["progress"], 0)
 
+    def test_progression_passport_notifications_do_not_crash_for_new_user(self):
+        result = build_progression(self.user)
+        self.assertEqual(result["challenge_xp"], 0)
+        self.assertEqual(result["challenge_badges"], [])
+        self.assertEqual(result["completed_challenges"], 0)
+        self.assertIn("challenge_streak", result)
+        self.assertEqual(self.client.get(f"/api/auth/passports/{self.user.pk}/").status_code, 200)
+        self.assertEqual(self.client.get("/api/notifications/").status_code, 200)
+
     def test_challenge_xp_counts_once_in_passport_and_levels(self):
         baseline = build_progression(self.user)
         self.client.post("/api/challenges/milestone-momentum/join/")
