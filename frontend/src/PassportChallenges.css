@@ -1,0 +1,11 @@
+.passport-challenge-section{background:linear-gradient(120deg,#f6f0ff,#fffbff);border:1px solid #e8ddf8}
+.passport-challenge-xp{font-size:12px;font-weight:800;color:#6b3dd6;padding:8px 12px;border-radius:999px;background:#fff}
+.passport-challenge-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:15px}
+.passport-challenge-stats>div{display:grid;grid-template-columns:auto 1fr;align-items:center;column-gap:8px;border-radius:14px;padding:13px;background:#fff;border:1px solid #eee5fa}
+.passport-challenge-stats>div>span{font-size:21px;grid-row:1/3}.passport-challenge-stats strong{font:800 20px Manrope;color:#6533cd}
+.passport-challenge-stats small{font-size:11px;color:#83768e}
+.passport-challenge-badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.passport-challenge-badge{font-size:12px;font-weight:800;color:#6138bb;background:#fff;padding:10px 12px;border:1px solid #e7d9fb;border-radius:12px}
+.passport-challenge-badges p{font-size:12px;line-height:1.5;color:#84778d;margin:0}
+.progression-challenge-xp-note{font-size:12px;color:#82738f;margin-top:7px}
+@media(max-width:590px){.passport-challenge-stats{grid-template-columns:1fr}.passport-challenge-stats>div{grid-template-columns:33px 1fr}}
