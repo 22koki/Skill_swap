@@ -11,3 +11,11 @@
 .quick-bookmark-choice,.quick-bookmark-done{border:0;text-align:left;background:#f6f2ff;color:#47316d;padding:9px;border-radius:9px;font-size:12px;cursor:pointer}
 .quick-bookmark-choice:hover{background:#ece2ff}.quick-bookmark-done{text-align:center;color:#fff;background:#6a3bd4}
 .quick-bookmark-error{position:absolute;top:100%;right:0;min-width:160px;color:#a12d4e;background:#fff4f5;padding:8px;border-radius:9px;font-size:11px}
+
+.quick-save-card{position:relative;min-width:0}
+.quick-save-card>.universal-skill-card,.quick-save-card>.universal-circle-card{width:100%;height:100%;padding-right:54px}
+.quick-save-card>.quick-bookmark{position:absolute;right:10px;top:10px;z-index:10}
+.smart-match-head>.quick-bookmark{margin-left:auto;align-self:flex-start}
+.circle-featured-actions>.quick-bookmark,.circle-discover-actions>.quick-bookmark{align-self:center}
+.passport-identity-actions>.quick-bookmark{align-self:center}
+@media(max-width:600px){.quick-bookmark-toggle{min-width:34px;padding:4px 9px}.quick-save-card>.quick-bookmark{right:7px;top:7px}}
