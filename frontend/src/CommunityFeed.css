@@ -1,0 +1,38 @@
+.feed-overlay{position:fixed;inset:0;z-index:1209;padding:18px;display:grid;place-items:center;background:rgba(27,16,55,.56);backdrop-filter:blur(7px)}
+.feed-shell{width:min(840px,100%);max-height:93vh;overflow:auto;border-radius:27px;background:#fbf9ff;box-shadow:0 30px 100px rgba(22,12,48,.32);color:#261c3c}
+.feed-hero{padding:30px 32px 25px;background:radial-gradient(circle at 92% 0%,rgba(255,179,197,.62),transparent 32%),linear-gradient(125deg,#efe7ff,#fffbff)}
+.feed-hero-top,.feed-hero-bottom{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.feed-hero-top span{font-size:11px;font-weight:900;letter-spacing:.14em;color:#7650c2}
+.feed-hero-top button{width:35px;height:35px;border:1px solid #e7def3;border-radius:50%;background:white;font-size:23px;color:#593a86;cursor:pointer}
+.feed-hero h2{font:800 clamp(25px,3vw,36px) Manrope;margin:13px 0 8px;letter-spacing:-.045em}
+.feed-hero p{font-size:13px;color:#7b708d;line-height:1.6;margin:0}
+.feed-hero-bottom{margin-top:21px}.feed-hero-bottom span{font-size:12px;color:#826e9f}
+.feed-hero-bottom button,.feed-composer-actions button,.feed-empty button{border:0;background:linear-gradient(120deg,#8751ff,#6335e6);color:#fff;border-radius:12px;padding:11px 16px;font-weight:800;cursor:pointer}
+.feed-content{padding:22px 32px 34px}
+.feed-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px;padding:5px;border-radius:14px;background:#f0ebf9}
+.feed-tabs button{border:0;padding:10px 13px;color:#786a8a;background:transparent;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer}
+.feed-tabs button.active{color:#6733d8;background:white;box-shadow:0 3px 10px rgba(48,27,80,.08)}
+.feed-list{display:grid;gap:13px}
+.feed-post,.feed-composer{background:#fff;border:1px solid #eee5f7;border-radius:20px;padding:20px;box-shadow:0 7px 24px rgba(48,30,91,.04)}
+.feed-post-head,.feed-composer-header{display:flex;align-items:center;gap:11px}
+.feed-avatar{width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#8860f5,#fb8b9f);color:#fff;display:grid;place-items:center;font:800 16px Manrope;flex-shrink:0;overflow:hidden}
+.feed-avatar img{width:100%;height:100%;object-fit:cover}
+.feed-post-person{display:grid;gap:4px;flex:1}.feed-post-person strong{font-size:14px}.feed-post-person small{font-size:11px;color:#8b7e99}
+.feed-delete{border:0;background:#fff2f5;border-radius:10px;color:#b44d72;font-weight:700;padding:8px 11px;cursor:pointer}
+.feed-kind{display:inline-block;margin-top:16px;background:#f0e9ff;color:#7147c6;padding:7px 11px;border-radius:99px;font-size:11px;font-weight:800}
+.feed-post-body{margin:14px 0;font-size:14px;line-height:1.75;color:#45394f;white-space:pre-wrap;overflow-wrap:anywhere}
+.feed-post-link{display:inline-flex;padding:10px 12px;background:#f7f2ff;border-radius:10px;color:#683cce;font-size:12px;font-weight:800}
+.feed-post-actions{display:flex;gap:12px;flex-wrap:wrap;padding-top:14px;margin-top:17px;border-top:1px solid #f0eaf8}
+.feed-post-actions button{border:0;background:transparent;padding:7px;color:#756787;font-size:12px;font-weight:800;cursor:pointer}.feed-post-actions button.reacted{color:#d14c8b}
+.feed-composer{display:grid;gap:12px;margin-bottom:20px}.feed-composer-header strong{font-size:15px}
+.feed-composer select,.feed-composer textarea,.feed-composer input,.feed-comments input{width:100%;min-width:0;box-sizing:border-box;border:1px solid #e5dbf0;border-radius:11px;padding:11px;color:#342841;background:#fff;font:inherit;font-size:13px;outline:none}
+.feed-composer-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}.feed-composer-actions span{font-size:11px;color:#92869b}
+.feed-composer-actions button:disabled,.feed-comments button:disabled{opacity:.6}
+.feed-comments{display:grid;gap:9px;border-top:1px solid #eee7f5;padding-top:14px;margin-top:10px}
+.feed-comment{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;background:#faf7ff;padding:11px 13px;border-radius:12px}
+.feed-comment strong{font-size:12px}.feed-comment p{font-size:12px;color:#695d78;margin:5px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.feed-comment button{border:0;background:transparent;color:#ae6784;font-size:11px;cursor:pointer}
+.feed-comments form{display:flex;gap:8px}.feed-comments form button{border:0;background:#eee6ff;color:#6735d8;border-radius:10px;padding:10px;font-weight:800;cursor:pointer}
+.feed-error{padding:12px;border-radius:12px;background:#fff0f5;color:#a3335c;font-size:12px}
+.feed-empty{text-align:center;padding:46px 20px;border:1.5px dashed #dfd1f3;border-radius:20px}.feed-empty span{font-size:40px}.feed-empty h3{font:800 21px Manrope;margin:10px}.feed-empty p,.feed-muted{font-size:13px;color:#887d94}
+@media(max-width:690px){.feed-overlay{padding:0;align-items:end}.feed-shell{max-height:96vh;border-radius:24px 24px 0 0}.feed-hero{padding:22px 18px}.feed-content{padding:17px}.feed-hero-bottom{align-items:flex-start;flex-wrap:wrap}.feed-tabs button{padding:9px}.feed-post{padding:15px}}
