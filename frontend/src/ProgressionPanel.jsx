@@ -1,3 +1,4 @@
+import "./PassportChallenges.css";
 export default function ProgressionPanel({open,progression,onClose}){
   if(!open || !progression) return null;
 
@@ -39,6 +40,30 @@ export default function ProgressionPanel({open,progression,onClose}){
           <div><span>⏱</span><strong>{progression.total_hours}</strong><small>hours exchanged</small></div>
           <div><span>🏅</span><strong>{progression.achievements_unlocked}/{progression.achievements_total}</strong><small>achievements</small></div>
         </div>
+
+        <section className="progression-section">
+          <div className="progression-section-head">
+            <div>
+              <div className="progression-kicker">CHALLENGE REWARDS</div>
+              <h3>Learning beyond swaps</h3>
+            </div>
+            <span>{progression.challenge_xp||0} XP earned</span>
+          </div>
+          <p className="progression-challenge-xp-note">
+            🔥 {progression.challenge_streak?.current||0} day learning streak ·
+            🏆 {progression.completed_challenges||0} challenges completed.
+            Challenge XP contributes to your total level and is awarded once per completed challenge.
+          </p>
+          <div className="achievement-grid">
+            {progression.challenge_badges?.length
+              ? progression.challenge_badges.map((badge,i)=><article className="achievement-card unlocked" key={badge.name||i}>
+                  <div className="achievement-icon">{badge.icon}</div>
+                  <div className="achievement-copy"><small>Challenge badge</small><h4>{badge.name}</h4><p>Earned through your learning challenge progress.</p></div>
+                  <span className="achievement-done">✓</span>
+                </article>)
+              : <div className="progression-empty">Complete a challenge to unlock badges here.</div>}
+          </div>
+        </section>
 
         <section className="progression-section">
           <div className="progression-section-head">
