@@ -3079,3 +3079,69 @@ html{scroll-behavior:smooth}.visual-button{border:0;cursor:pointer}.chip{border:
  .nav-refined .nav-icon-button{width:38px;height:38px}
  .nav-refined .nav-compact-trigger,.nav-refined .nav-search-button{width:38px;height:38px;min-width:38px}
 }
+
+
+/* Notifications drawer: prevent grid auto-row compression when the activity feed is long.
+   The previous nested grids compressed every notification to a thin strip. */
+.notification-drawer{
+  display:flex;
+  flex-direction:column;
+  height:100%;
+  min-height:0;
+}
+.notification-header,
+.notification-toolbar,
+.notification-footer{
+  flex:0 0 auto;
+}
+.notification-preferences{
+  flex:0 1 auto;
+  min-height:0;
+  max-height:44vh;
+  overflow-y:auto;
+}
+.notification-list{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  align-content:normal;
+  flex:1 1 auto;
+  min-height:0;
+  min-width:0;
+  gap:10px;
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+}
+.notification-card{
+  flex:0 0 auto;
+  height:auto;
+  min-height:74px;
+  box-sizing:border-box;
+}
+.notification-card-main{
+  height:auto;
+  min-height:72px;
+  grid-template-columns:49px minmax(0,1fr);
+  align-items:start;
+  box-sizing:border-box;
+}
+.notification-copy,
+.notification-title-row,
+.notification-title-row h4{
+  min-width:0;
+}
+.notification-title-row h4,
+.notification-copy p{
+  overflow-wrap:anywhere;
+  white-space:normal;
+}
+.notification-title-row time{
+  flex:0 0 auto;
+}
+@media(max-width:480px){
+  .notification-card-main{grid-template-columns:43px minmax(0,1fr);gap:9px;padding:12px}
+  .notification-visual img,.notification-icon{width:42px;height:42px}
+  .notification-title-row{flex-wrap:wrap;gap:3px 8px}
+  .notification-title-row time{font-size:9px}
+}
