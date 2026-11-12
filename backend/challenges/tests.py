@@ -9,6 +9,7 @@ from goals.models import LearningGoal, Milestone
 
 from .models import ChallengeEnrollment
 from .services import learning_streak
+from users.progression import build_progression
 
 
 class ChallengeTests(TestCase):
@@ -67,6 +68,36 @@ class ChallengeTests(TestCase):
         item = next(x for x in data["challenges"] if x["slug"] == "project-showcase")
         self.assertEqual(item["state"], "available")
         self.assertEqual(item["progress"], 0)
+
+    def test_challenge_xp_counts_once_in_passport_and_levels(self):
+        baseline = build_progression(self.user)
+        self.client.post("/api/challenges/milestone-momentum/join/")
+        goal = LearningGoal.objects.create(owner=self.user, title="Learn React")
+        for number in range(5):
+            Milestone.objects.create(
+                goal=goal, title=f"Step {number}",
+                is_done=True, completed_at=timezone.now()
+            )
+        first = build_progression(self.user)
+        second = build_progression(self.user)
+        self.assertEqual(first["challenge_xp"], 150)
+        self.assertEqual(first["xp"] - baseline["xp"], 150)
+        self.assertEqual(first["xp"], second["xp"])
+        self.assertEqual(first["completed_challenges"], 1)
+        self.assertEqual(first["challenge_badges"], [{"name": "Goal Getter", "icon": "🎯"}])
+        self.assertEqual(len([a for a in first["unlocked"] if a["key"] == "challenge-milestone-momentum"]), 1)
+        self.assertEqual(
+            self.client.get(f"/api/auth/passports/{self.user.id}/").status_code,
+            200,
+        )
+
+    def test_challenges_not_awarded_before_enrolling(self):
+        goal = LearningGoal.objects.create(owner=self.user, title="Earlier progress")
+        for i in range(5):
+            Milestone.objects.create(goal=goal, title=f"Earlier {i}", is_done=True, completed_at=timezone.now())
+        result = build_progression(self.user)
+        self.assertEqual(result["challenge_xp"], 0)
+        self.assertFalse(any(a["key"] == "challenge-milestone-momentum" for a in result["unlocked"]))
 
     def test_auth_and_unknown_challenge(self):
         self.assertEqual(self.client.post("/api/challenges/not-a-challenge/join/").status_code, 404)

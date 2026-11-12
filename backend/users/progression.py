@@ -6,6 +6,7 @@ from django.utils import timezone
 from bookings.models import Booking
 from reviews.models import Review
 from skills.models import UserSkill
+from challenges.services import challenges_dashboard
 
 
 LEVELS = [
@@ -72,6 +73,10 @@ def _achievement(key, icon, title, description, current, target, xp, category):
         "target": target,
         "progress": progress,
         "xp": xp,
+        "challenge_xp": challenge_data["earned_xp"],
+        "challenge_badges": challenge_data["badges"],
+        "challenge_streak": challenge_data["streak"],
+        "completed_challenges": challenge_data["completed_challenges"],
         "unlocked": unlocked,
     }
 
@@ -111,6 +116,23 @@ def build_progression(user):
         _achievement("unstoppable", "⚡", "Unstoppable", "Reach a 6-week SkillSwap streak.", current_streak, 6, 450, "Momentum"),
         _achievement("swap-veteran", "🏆", "Swap Veteran", "Complete 25 SkillSwaps.", completed, 25, 700, "Journey"),
     ]
+
+    # The Challenges dashboard is the single source of truth for unlocked rewards.
+    # Don't independently award points when the same achievement is read again.
+    challenge_data = challenges_dashboard(user)
+    achievements.extend([
+        _achievement(
+            "challenge-" + item["slug"],
+            item["icon"],
+            item["badge"],
+            "Complete " + item["title"] + " to earn this badge.",
+            item["progress"],
+            item["target"],
+            item["xp"],
+            "Challenges",
+        )
+        for item in challenge_data["challenges"]
+    ])
 
     unlocked = [item for item in achievements if item["unlocked"]]
     earned_achievement_xp = sum(item["xp"] for item in unlocked)
