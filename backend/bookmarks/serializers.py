@@ -44,7 +44,7 @@ class BookmarkSerializer(serializers.ModelSerializer):
         fields = super().get_fields()
         request = self.context.get("request")
         if request and request.user.is_authenticated:
-            fields["collection_ids"].queryset = Collection.objects.filter(owner=request.user)
+            fields["collection_ids"].child_relation.queryset = Collection.objects.filter(owner=request.user)
         return fields
 
     def get_title(self, obj):
