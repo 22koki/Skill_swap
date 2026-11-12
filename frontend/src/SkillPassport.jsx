@@ -1,4 +1,5 @@
 import { getSkillVisual } from "./skillVisuals";
+import BookmarkButton from "./BookmarkButton";
 
 function formatMemberSince(value){
   if(!value) return "";
@@ -10,7 +11,7 @@ function formatJourneyDate(value){
   return new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric",year:"numeric"}).format(new Date(value));
 }
 
-export default function SkillPassport({open,passport,currentUserId,onBlock,onReport,onClose}){
+export default function SkillPassport({open,passport,currentUserId,onBlock,onReport,onClose,bookmarkProps}){
   if(!open || !passport) return null;
 
   const initials=(passport.name||passport.username||"SS").split(" ").map(x=>x[0]).join("").slice(0,2).toUpperCase();
@@ -52,6 +53,7 @@ export default function SkillPassport({open,passport,currentUserId,onBlock,onRep
             </div>
 
             <div className="passport-identity-actions">
+              {currentUserId&&currentUserId!==passport.user_id&&<BookmarkButton type="user" id={passport.user_id} {...bookmarkProps}/>}
               <div className="passport-reputation-badge">
                 <strong>{Number(passport.stats.average_rating||0).toFixed(1)}</strong>
                 <span>★ reputation</span>
