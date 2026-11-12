@@ -3024,3 +3024,58 @@ html{scroll-behavior:smooth}.visual-button{border:0;cursor:pointer}.chip{border:
   .home-next-session{grid-template-columns:1fr}.home-next-time{width:100%;height:auto;padding:9px;grid-template-columns:auto auto auto;justify-content:start;gap:6px}.home-next-time strong{font-size:18px}
   .home-empty-card{grid-template-columns:1fr}.home-level-card{grid-template-columns:auto 1fr}.home-level-card>em{display:none}
 }
+
+
+/* 2026: Responsive navbar with separate learning and compact menus */
+.nav-refined{
+  width:min(1400px,calc(100% - 32px));
+  gap:12px;
+  display:flex;
+  flex-wrap:nowrap;
+  align-items:center;
+  justify-content:space-between;
+}
+.nav-refined .brand{min-width:max-content;white-space:nowrap;flex-shrink:0}
+.nav-refined .nav-main-links{flex:1 1 auto;min-width:0;gap:2px;white-space:nowrap}
+.nav-refined .nav-primary-link,.nav-refined .nav-explore>summary{padding:10px 9px}
+.nav-refined .nav-actions{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex:0 0 auto;min-width:0}
+.nav-learning-trigger{border:1px solid #e7dbf8;border-radius:14px;background:linear-gradient(120deg,#f5efff,#fff);padding:10px 14px;display:flex;gap:8px;align-items:center;white-space:nowrap;font-size:13px;font-weight:800;color:#6540b6;cursor:pointer}
+.nav-learning-trigger>span:first-child{font-size:17px;color:#884be8}
+.nav-learning-menu{right:0;left:auto;width:280px;max-width:calc(100vw - 24px)}
+.nav-compact-menu{display:none}
+.nav-compact-trigger{border:1px solid #e7dbf8;border-radius:14px;background:#fff;padding:10px 12px;display:flex;gap:7px;align-items:center;color:#604a83;font-size:13px;font-weight:800;white-space:nowrap;cursor:pointer}
+.nav-compact-trigger>span{font-size:19px;line-height:1}
+.nav-compact-dropdown{left:0;right:auto;width:290px;max-width:calc(100vw - 24px);max-height:min(74vh,550px);overflow-y:auto}
+.nav-refined .nav-dropdown[open]{z-index:10030}
+@media(max-width:1250px){
+ .nav-refined .nav-main-links{display:none}
+ .nav-refined .nav-compact-menu{display:block}
+ .nav-refined .nav-actions{flex:1;justify-content:flex-end}
+}
+@media(max-width:980px){
+ .nav-refined .nav-actions{display:flex}
+ .nav-refined .nav-compact-menu{display:block}
+ .nav-refined .nav-learning{display:block}
+}
+@media(max-width:760px){
+ .nav-refined{width:calc(100% - 18px);margin:9px auto 0;padding:8px 10px;gap:8px;border-radius:19px}
+ .nav-refined .nav-actions{gap:6px}
+ .nav-refined .brand b{display:block;font-size:17px}
+ .nav-refined .brand span{width:38px;height:38px}
+ .nav-refined .nav-learning{display:none}
+ .nav-refined .nav-compact-trigger b{display:none}
+ .nav-refined .nav-compact-trigger{width:40px;height:40px;justify-content:center;padding:0}
+ .nav-refined .nav-search-button{width:40px;height:40px;min-width:40px;justify-content:center;padding:0}
+ .nav-refined .nav-search-button>b,.nav-refined .nav-search-button>kbd{display:none}
+ .nav-refined .nav-account>summary{min-width:42px;width:42px;height:42px;padding:4px;justify-content:center}
+ .nav-refined .nav-account-copy,.nav-refined .nav-account>summary>.nav-chevron{display:none}
+ .nav-refined .nav-account-avatar{width:32px;height:32px}
+ .nav-refined .nav-account-menu{right:0;left:auto}
+ .nav-refined .nav-compact-dropdown{position:fixed;top:69px;left:10px!important;right:10px!important;width:auto;max-width:none}
+}
+@media(max-width:500px){
+ .nav-refined .brand b{display:none}
+ .nav-refined .nav-actions{gap:5px}
+ .nav-refined .nav-icon-button{width:38px;height:38px}
+ .nav-refined .nav-compact-trigger,.nav-refined .nav-search-button{width:38px;height:38px;min-width:38px}
+}

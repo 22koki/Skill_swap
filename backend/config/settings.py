@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "bookmarks",
     "goals",
     "community",
+    "challenges",
 ]
 
 MIDDLEWARE = [

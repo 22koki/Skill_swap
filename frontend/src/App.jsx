@@ -22,6 +22,7 @@ import HomeDashboard from "./HomeDashboard";
 import SavedPanel from "./SavedPanel";
 import LearningGoals from "./LearningGoals";
 import CommunityFeed from "./CommunityFeed";
+import LearningChallenges from "./LearningChallenges";
 import { getSkillVisual } from "./skillVisuals";
 
 const API = "http://127.0.0.1:8000/api";
@@ -138,6 +139,7 @@ export default function App(){
  const [savedOpen,setSavedOpen]=useState(false);
  const [goalsOpen,setGoalsOpen]=useState(false);
  const [communityOpen,setCommunityOpen]=useState(false);
+ const [challengesOpen,setChallengesOpen]=useState(false);
  const [bookmarks,setBookmarks]=useState([]);
  const [bookmarkCollections,setBookmarkCollections]=useState([]);
  const [circlesOpen,setCirclesOpen]=useState(false);
@@ -1569,7 +1571,7 @@ export default function App(){
   setProgression(null); setProgressionOpen(false); setAchievementUnlock(null);
   setNotificationOpen(false); setNotifications([]); setNotificationUnread(0);
   setNetworkOpen(false); setNetworkData(null);
-  setSavedOpen(false); setGoalsOpen(false); setCommunityOpen(false); setBookmarks([]); setBookmarkCollections([]);
+  setSavedOpen(false); setGoalsOpen(false); setCommunityOpen(false); setChallengesOpen(false); setBookmarks([]); setBookmarkCollections([]);
   setCirclesOpen(false); setCircles([]); setActiveCircle(null); setCircleMessages([]); setCircleFocusId(null);
   setScheduleOpen(false); setSelectedSwap(null); setScheduleSuggestions([]); setScheduleError("");
   setRescheduleOpen(false); setRescheduleBooking(null); setRescheduleSuggestions([]);
@@ -1755,13 +1757,56 @@ export default function App(){
    </div>
 
    <div className="actions nav-actions">
+    <details className="nav-dropdown nav-compact-menu" onToggle={e=>{
+     if(e.currentTarget.open){
+      document.querySelectorAll(".nav-dropdown[open]").forEach(item=>{
+       if(item!==e.currentTarget)item.removeAttribute("open");
+      });
+     }
+    }}>
+     <summary className="nav-compact-trigger"><span>☰</span><b>Menu</b></summary>
+     <div className="nav-dropdown-menu nav-compact-dropdown">
+      <div className="nav-dropdown-label">NAVIGATION</div>
+      <a href="#discover" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><span className="nav-menu-icon">✦</span><span><b>Discover</b><small>Find new skill matches</small></span></a>
+      {user&&<a href="#requests" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><span className="nav-menu-icon">↗</span><span><b>Requests</b><small>Manage your swaps</small></span></a>}
+      {user&&<a href="#bookings" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><span className="nav-menu-icon">📅</span><span><b>Bookings</b><small>Your scheduled sessions</small></span></a>}
+      {user&&<button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");if(conversations[0])openChat(conversations[0].swap);else setNotice("Messages will appear after accepting a SkillSwap.");}}><span className="nav-menu-icon">💬</span><span><b>Messages</b><small>Chat with your partners</small></span></button>}
+      {user&&<button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setGoalsOpen(true);}}><span className="nav-menu-icon">🎯</span><span><b>Goals</b><small>Learning milestones</small></span></button>}
+      {user&&<button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setChallengesOpen(true);}}><span className="nav-menu-icon">🏆</span><span><b>Challenges</b><small>Learning streaks</small></span></button>}
+      {user&&<button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setCommunityOpen(true);}}><span className="nav-menu-icon">💜</span><span><b>Community</b><small>Social learning feed</small></span></button>}
+      {user&&<button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setSavedOpen(true);}}><span className="nav-menu-icon">♡</span><span><b>Saved</b><small>Your saved items</small></span></button>}
+      <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openSkillCircles();}}><span className="nav-menu-icon">👥</span><span><b>Skill Circles</b><small>Group learning</small></span></button>
+      <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openSkillNetwork();}}><span className="nav-menu-icon">🕸</span><span><b>Skill Network</b><small>Explore connections</small></span></button>
+     </div>
+    </details>
     <button className="nav-search-button" onClick={openUniversalSearch} aria-label="Search SkillSwap">
       <span>⌕</span><b>Search</b><kbd>⌘ K</kbd>
     </button>
     {user ? <>
-      <button className="ghost" onClick={()=>setSavedOpen(true)} aria-label="Saved bookmarks and collections">♡ Saved</button>
-      <button className="ghost" onClick={()=>setGoalsOpen(true)} aria-label="Personal learning goals">🎯 Goals</button>
-      <button className="ghost" onClick={()=>setCommunityOpen(true)} aria-label="Community activity feed">💜 Community</button>
+      <details className="nav-dropdown nav-learning" onToggle={e=>{
+       if(e.currentTarget.open){
+        document.querySelectorAll(".nav-dropdown[open]").forEach(item=>{
+         if(item!==e.currentTarget)item.removeAttribute("open");
+        });
+       }
+      }}>
+       <summary className="nav-learning-trigger"><span>✦</span> My Learning <span className="nav-chevron">⌄</span></summary>
+       <div className="nav-dropdown-menu nav-learning-menu">
+        <div className="nav-dropdown-label">YOUR LEARNING SPACE</div>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setGoalsOpen(true);}}>
+         <span className="nav-menu-icon">🎯</span><span><b>Learning Goals</b><small>Milestones and progress</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setChallengesOpen(true);}}>
+         <span className="nav-menu-icon">🏆</span><span><b>Challenges</b><small>Streaks, rewards and badges</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setCommunityOpen(true);}}>
+         <span className="nav-menu-icon">💜</span><span><b>Community Feed</b><small>Updates and shared projects</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setSavedOpen(true);}}>
+         <span className="nav-menu-icon">♡</span><span><b>Saved Library</b><small>Bookmarks and collections</small></span>
+        </button>
+       </div>
+      </details>
       <button className="notification-bell nav-icon-button" onClick={()=>{setNotificationOpen(true);loadNotifications();}} aria-label="Notifications">
        <span className="notification-bell-icon">🔔</span>
        {notificationUnread>0 && <b>{notificationUnread>99?"99+":notificationUnread}</b>}
@@ -1811,6 +1856,10 @@ export default function App(){
         <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setCommunityOpen(true);}}>
          <span className="nav-menu-icon">💜</span>
          <span><b>Community</b><small>Share progress and celebrate learning</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setChallengesOpen(true);}}>
+         <span className="nav-menu-icon">🏆</span>
+         <span><b>Learning Challenges</b><small>Challenges, badges and learning streaks</small></span>
         </button>
         <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setGoalsOpen(true);}}>
          <span className="nav-menu-icon">🎯</span>
@@ -2153,6 +2202,8 @@ export default function App(){
     onOpenBooking={openCalendarBooking}
     onOpenCircle={openCalendarCircle}
   />
+
+  <LearningChallenges open={challengesOpen} onClose={()=>setChallengesOpen(false)} api={api} onOpenGoals={()=>setGoalsOpen(true)} onOpenCommunity={()=>setCommunityOpen(true)} />
 
   <CommunityFeed open={communityOpen} onClose={()=>setCommunityOpen(false)} api={api} user={user} />
 
