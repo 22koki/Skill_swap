@@ -7,7 +7,7 @@ function formatDate(value){
   }).format(new Date(value));
 }
 
-export default function BookingsPanel({ bookings, currentUser, onAction, onMessage, onWorkspace, onReview }) {
+export default function BookingsPanel({ bookings, currentUser, onAction, onMessage, onWorkspace, onReview, onReschedule, onRescheduleAction, onCalendar }) {
   const upcoming=bookings.filter(b=>b.status==="scheduled");
   const completed=bookings.filter(b=>b.status==="completed");
   if(!upcoming.length && !completed.length) return null;
@@ -26,7 +26,10 @@ export default function BookingsPanel({ bookings, currentUser, onAction, onMessa
           <h2>Upcoming SkillSwaps</h2>
           <p className="section-copy">Your accepted exchanges now have a time, place, and clear next step.</p>
         </div>
-        <div className="booking-count glass">{upcoming.length}<span>scheduled</span></div>
+        <div className="booking-heading-actions">
+          <button className="outline booking-calendar-button" onClick={onCalendar}>📅 Open calendar</button>
+          <div className="booking-count glass">{upcoming.length}<span>scheduled</span></div>
+        </div>
       </div>
 
       {!!upcoming.length && <div className="booking-grid">
@@ -123,6 +126,23 @@ export default function BookingsPanel({ bookings, currentUser, onAction, onMessa
                 </div>
               </div>
 
+              {booking.pending_reschedule&&<div className={"reschedule-request-card "+(booking.pending_reschedule.requested_by_id===currentUser?.id?"mine":"incoming")}>
+                <div className="reschedule-request-icon">↻</div>
+                <div className="reschedule-request-copy">
+                  <small>{booking.pending_reschedule.requested_by_id===currentUser?.id?"RESCHEDULE PROPOSAL SENT":"NEW RESCHEDULE PROPOSAL"}</small>
+                  <b>{formatDate(booking.pending_reschedule.proposed_starts_at)}</b>
+                  <span>{booking.pending_reschedule.proposed_duration_minutes} min · {booking.pending_reschedule.proposed_mode==="online"?"Online":"In person"}</span>
+                </div>
+                <div className="reschedule-request-actions">
+                  {booking.pending_reschedule.requested_by_id===currentUser?.id
+                    ? <button className="outline" onClick={()=>onRescheduleAction(booking.pending_reschedule.id,"cancel")}>Cancel proposal</button>
+                    : <>
+                      <button className="outline" onClick={()=>onRescheduleAction(booking.pending_reschedule.id,"decline")}>Decline</button>
+                      <button className="primary" onClick={()=>onRescheduleAction(booking.pending_reschedule.id,"accept")}>Accept new time</button>
+                    </>}
+                </div>
+              </div>}
+
               <div className="bpr-bottom">
                 <div className="bpr-note">
                   <span>“</span>
@@ -134,6 +154,7 @@ export default function BookingsPanel({ bookings, currentUser, onAction, onMessa
                   <button className="outline bpr-message" onClick={()=>onMessage(booking.swap)}>💬 Message partner</button>
                   {booking.mode==="online" && booking.meeting_link &&
                     <a className="outline booking-link" href={booking.meeting_link} target="_blank" rel="noreferrer">Open meeting ↗</a>}
+                  {!booking.pending_reschedule&&<button className="outline bpr-reschedule" onClick={()=>onReschedule(booking)}>↻ Reschedule</button>}
                   <button className="danger-soft" onClick={()=>onAction(booking.id,"cancel")}>Cancel</button>
                   <button className="primary bpr-complete" onClick={()=>onAction(booking.id,"complete")}>Complete session ✓</button>
                 </div>
@@ -175,6 +196,7 @@ export default function BookingsPanel({ bookings, currentUser, onAction, onMessa
                 </div>
 
                 <div className="completed-booking-actions">
+                  <button className="outline recap-open-button" onClick={()=>onWorkspace(booking.id)}>✦ AI Recap</button>
                   {booking.review_status?.reviewed
                     ? <span className="reviewed-chip">✓ Reviewed</span>
                     : <button className="primary review-now-button" onClick={()=>onReview(booking)}>⭐ Leave review</button>}

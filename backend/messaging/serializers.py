@@ -7,8 +7,8 @@ class MessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Message
-        fields = ["id", "sender", "sender_name", "sender_avatar_url", "body", "created_at", "read_at"]
-        read_only_fields = ["sender", "created_at", "read_at"]
+        fields = ["id", "sender", "sender_name", "sender_avatar_url", "body", "created_at", "delivered_at", "read_at"]
+        read_only_fields = ["sender", "created_at", "delivered_at", "read_at"]
 
     def get_sender_name(self, obj):
         return obj.sender.get_full_name() or obj.sender.username
@@ -27,13 +27,15 @@ class ConversationSerializer(serializers.ModelSerializer):
     swap_status = serializers.CharField(source="swap.status", read_only=True)
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
+    partner_online = serializers.SerializerMethodField()
+    partner_last_seen = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
         fields = [
             "id", "swap", "partner_id", "partner_name", "partner_avatar_url", "partner_location",
             "offered_skill_name", "requested_skill_name", "swap_status",
-            "last_message", "unread_count", "created_at", "updated_at",
+            "last_message", "unread_count", "partner_online", "partner_last_seen", "created_at", "updated_at",
         ]
 
     def _partner(self, obj):
@@ -64,8 +66,22 @@ class ConversationSerializer(serializers.ModelSerializer):
         message = obj.messages.order_by("-created_at").first()
         return MessageSerializer(message).data if message else None
 
+    def get_partner_online(self, obj):
+        presence = _presence_for(self._partner(obj))
+        return bool(presence and presence.connection_count > 0)
+
+    def get_partner_last_seen(self, obj):
+        presence = _presence_for(self._partner(obj))
+        return presence.last_seen if presence else None
+
     def get_unread_count(self, obj):
         request = self.context.get("request")
         if not request or not request.user.is_authenticated:
             return 0
         return obj.messages.exclude(sender=request.user).filter(read_at__isnull=True).count()
+
+
+def _presence_for(partner):
+    if not partner:
+        return None
+    return getattr(partner, "realtime_presence", None)

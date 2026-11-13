@@ -8,6 +8,13 @@ class SessionWorkspace(models.Model):
     lesson_plan = models.TextField(blank=True)
     shared_notes = models.TextField(blank=True)
     progress_percentage = models.PositiveSmallIntegerField(default=0)
+    ai_plan = models.JSONField(default=dict, blank=True)
+    ai_plan_source = models.CharField(max_length=20, blank=True)
+    ai_goal = models.CharField(max_length=500, blank=True)
+    ai_learner_level = models.CharField(max_length=40, blank=True)
+    ai_learning_style = models.CharField(max_length=40, blank=True)
+    ai_session_count = models.PositiveSmallIntegerField(default=3)
+    ai_plan_updated_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -49,3 +56,23 @@ class WorkspaceChecklistItem(models.Model):
 
     class Meta:
         ordering = ["created_at"]
+
+
+class SessionRecap(models.Model):
+    workspace = models.ForeignKey(SessionWorkspace, on_delete=models.CASCADE, related_name="recaps")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="skillswap_session_recaps")
+    reflection = models.TextField(blank=True)
+    challenge = models.CharField(max_length=500, blank=True)
+    confidence = models.PositiveSmallIntegerField(default=3)
+    recap = models.JSONField(default=dict, blank=True)
+    source = models.CharField(max_length=20, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["workspace", "user"], name="unique_workspace_user_recap")
+        ]
+
+    def __str__(self):
+        return f"Recap · workspace #{self.workspace_id} · {self.user.username}"

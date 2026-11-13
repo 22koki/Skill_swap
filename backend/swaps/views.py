@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import Swap
 from .serializers import SwapSerializer
+from notifications.models import Notification
+from notifications.services import notify
 
 class SwapListCreateView(generics.ListCreateAPIView):
     serializer_class = SwapSerializer
@@ -16,7 +18,17 @@ class SwapListCreateView(generics.ListCreateAPIView):
         ).select_related("requester", "recipient", "offered_skill", "requested_skill")
 
     def perform_create(self, serializer):
-        serializer.save(requester=self.request.user)
+        swap = serializer.save(requester=self.request.user)
+        notify(
+            swap.recipient,
+            Notification.Kind.SWAP,
+            f"{self.request.user.get_full_name() or self.request.user.username} wants to SkillSwap",
+            f"{swap.offered_skill.name} ↔ {swap.requested_skill.name}",
+            actor=self.request.user,
+            action_type="swap",
+            target_id=swap.id,
+            dedupe_key=f"swap-proposed:{swap.id}",
+        )
 
 class SwapActionView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -50,4 +62,13 @@ class SwapActionView(APIView):
 
         swap.status = target
         swap.save(update_fields=["status", "updated_at"])
+
+        other = swap.requester if request.user == swap.recipient else swap.recipient
+        if action == "accept":
+            notify(other, Notification.Kind.SWAP, "Your SkillSwap was accepted", f"{swap.offered_skill.name} ↔ {swap.requested_skill.name}", actor=request.user, action_type="swap", target_id=swap.id, dedupe_key=f"swap-accepted:{swap.id}")
+        elif action == "decline":
+            notify(other, Notification.Kind.SWAP, "Your SkillSwap was declined", f"{swap.offered_skill.name} ↔ {swap.requested_skill.name}", actor=request.user, action_type="swap", target_id=swap.id, dedupe_key=f"swap-declined:{swap.id}")
+        elif action == "cancel":
+            notify(other, Notification.Kind.SWAP, "A SkillSwap proposal was cancelled", f"{swap.offered_skill.name} ↔ {swap.requested_skill.name}", actor=request.user, action_type="swap", target_id=swap.id, dedupe_key=f"swap-cancelled:{swap.id}")
+
         return Response(SwapSerializer(swap).data)

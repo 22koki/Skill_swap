@@ -4,3 +4,10 @@ django-cors-headers>=4.6
 djangorestframework-simplejwt>=5.5
 psycopg[binary]>=3.2
 python-dotenv>=1.1
+
+openai>=2.0
+
+channels[daphne]>=4.3,<5
+channels-redis>=4.2,<5
+
+whitenoise>=6.8,<7

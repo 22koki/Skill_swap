@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Swap
+from users.safety import interaction_block_reason
 
 class SwapSerializer(serializers.ModelSerializer):
     requester_name = serializers.SerializerMethodField()
@@ -58,6 +59,10 @@ class SwapSerializer(serializers.ModelSerializer):
         if recipient == request.user:
             raise serializers.ValidationError("You cannot propose a swap to yourself.")
 
+        safety_reason = interaction_block_reason(request.user, recipient)
+        if safety_reason:
+            raise serializers.ValidationError(safety_reason)
+
         if not request.user.skill_links.filter(skill=offered, kind="teach").exists():
             raise serializers.ValidationError("You can only offer a skill listed under Skills I Teach.")
 
@@ -65,3 +70,4 @@ class SwapSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("That user does not currently teach the requested skill.")
 
         return attrs
+

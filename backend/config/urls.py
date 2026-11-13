@@ -19,4 +19,10 @@ urlpatterns = [
     path("api/messages/", include("messaging.urls")),
     path("api/workspaces/", include("workspaces.urls")),
     path("api/reviews/", include("reviews.urls")),
+    path("api/notifications/", include("notifications.urls")),
+    path("api/circles/", include("circles.urls")),
+    path("api/bookmarks/", include("bookmarks.urls")),
+    path("api/goals/", include("goals.urls")),
+    path("api/community/", include("community.urls")),
+    path("api/challenges/", include("challenges.urls")),
 ]

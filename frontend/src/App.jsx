@@ -1,24 +1,38 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import RequestsPanel from "./RequestsPanel";
 import BookingsPanel from "./BookingsPanel";
 import ScheduleSwapModal from "./ScheduleSwapModal";
+import RescheduleModal from "./RescheduleModal";
+import CalendarPanel from "./CalendarPanel";
 import ChatPanel from "./ChatPanel";
 import WorkspacePanel from "./WorkspacePanel";
 import ReviewModal from "./ReviewModal";
+import SkillPassport from "./SkillPassport";
+import AvailabilityModal from "./AvailabilityModal";
+import SmartMatchCard from "./SmartMatchCard";
+import ProgressionPanel from "./ProgressionPanel";
+import AchievementUnlock from "./AchievementUnlock";
+import NotificationCenter from "./NotificationCenter";
+import SkillNetwork from "./SkillNetwork";
+import SkillCircles from "./SkillCircles";
+import UniversalSearch from "./UniversalSearch";
+import ReportModal from "./ReportModal";
+import SafetyCenter from "./SafetyCenter";
+import HomeDashboard from "./HomeDashboard";
+import SavedPanel from "./SavedPanel";
+import LearningGoals from "./LearningGoals";
+import CommunityFeed from "./CommunityFeed";
+import LearningChallenges from "./LearningChallenges";
 import { getSkillVisual } from "./skillVisuals";
 
-const API = "http://127.0.0.1:8000/api";
-const previewMatches = [
-  {name:"Alex M.",teaches:"Photography",wants:"Python",score:96,rating:4.8,swaps:18,icon:"📸",preview:true},
-  {name:"Jane K.",teaches:"Graphic Design",wants:"Photography",score:84,rating:4.9,swaps:27,icon:"🎨",preview:true},
-  {name:"Brian T.",teaches:"Video Editing",wants:"React",score:78,rating:4.7,swaps:12,icon:"🎬",preview:true}
-];
-
+const API = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
+const WS_BASE = API.replace(/^http/,"ws").replace(/\/api$/,"");
 export default function App(){
  const [teach,setTeach]=useState("Python");
  const [learn,setLearn]=useState("Photography");
  const [searched,setSearched]=useState(false);
- const [matches,setMatches]=useState(previewMatches);
+ const [matches,setMatches]=useState([]);
+ const [communityUsers,setCommunityUsers]=useState([]);
  const [token,setToken]=useState(localStorage.getItem("skillswap_access") || "");
  const [user,setUser]=useState(null);
  const [authOpen,setAuthOpen]=useState(false);
@@ -40,6 +54,24 @@ export default function App(){
  const [bookings,setBookings]=useState([]);
  const [scheduleOpen,setScheduleOpen]=useState(false);
  const [selectedSwap,setSelectedSwap]=useState(null);
+ const [scheduleSuggestions,setScheduleSuggestions]=useState([]);
+ const [scheduleSuggestionsLoading,setScheduleSuggestionsLoading]=useState(false);
+ const [scheduleAvailabilityComplete,setScheduleAvailabilityComplete]=useState(false);
+ const [scheduleError,setScheduleError]=useState("");
+ const [rescheduleOpen,setRescheduleOpen]=useState(false);
+ const [rescheduleBooking,setRescheduleBooking]=useState(null);
+ const [rescheduleSuggestions,setRescheduleSuggestions]=useState([]);
+ const [rescheduleSuggestionsLoading,setRescheduleSuggestionsLoading]=useState(false);
+ const [rescheduleForm,setRescheduleForm]=useState({
+  starts_at:"",
+  duration_minutes:"60",
+  mode:"online",
+  meeting_link:"",
+  location_note:"",
+  note:""
+ });
+ const [calendarOpen,setCalendarOpen]=useState(false);
+ const [calendarEvents,setCalendarEvents]=useState([]);
  const [bookingForm,setBookingForm]=useState({
   starts_at:"",
   duration_minutes:"60",
@@ -54,15 +86,86 @@ export default function App(){
  const [chatMessages,setChatMessages]=useState([]);
  const [chatDraft,setChatDraft]=useState("");
  const [chatSending,setChatSending]=useState(false);
+ const [chatPartnerTyping,setChatPartnerTyping]=useState(false);
+ const [chatPartnerOnline,setChatPartnerOnline]=useState(false);
+ const [chatPartnerLastSeen,setChatPartnerLastSeen]=useState(null);
+ const [presenceByUser,setPresenceByUser]=useState({});
+ const refreshPromiseRef=useRef(null);
+ const sessionEpochRef=useRef(0);
+ const activitySocketRef=useRef(null);
+ const chatSocketRef=useRef(null);
+ const circleSocketRef=useRef(null);
+ const typingTimerRef=useRef(null);
+ const circleTypingTimerRef=useRef(null);
  const [workspaceOpen,setWorkspaceOpen]=useState(false);
  const [workspace,setWorkspace]=useState(null);
  const [workspaceForm,setWorkspaceForm]=useState({goals:"",lesson_plan:"",shared_notes:"",progress_percentage:0});
  const [workspaceResourceForm,setWorkspaceResourceForm]=useState({title:"",url:"",kind:"link"});
  const [workspaceChecklistText,setWorkspaceChecklistText]=useState("");
  const [workspaceSaving,setWorkspaceSaving]=useState(false);
+ const [workspaceAISetup,setWorkspaceAISetup]=useState({
+  goal:"",
+  learner_level:"beginner",
+  learning_style:"step_by_step",
+  session_count:3
+ });
+ const [workspaceAIGenerating,setWorkspaceAIGenerating]=useState(false);
+ const [workspaceAIAddingChecklist,setWorkspaceAIAddingChecklist]=useState(false);
+ const [workspaceAISavingPlan,setWorkspaceAISavingPlan]=useState(false);
+ const [recapReflection,setRecapReflection]=useState("");
+ const [recapChallenge,setRecapChallenge]=useState("");
+ const [recapConfidence,setRecapConfidence]=useState(3);
+ const [recapGenerating,setRecapGenerating]=useState(false);
+ const [recapAddingChecklist,setRecapAddingChecklist]=useState(false);
  const [reviewOpen,setReviewOpen]=useState(false);
  const [reviewBooking,setReviewBooking]=useState(null);
  const [reviewSaving,setReviewSaving]=useState(false);
+ const [passportOpen,setPassportOpen]=useState(false);
+ const [passport,setPassport]=useState(null);
+ const [passportLoading,setPassportLoading]=useState(false);
+ const [availabilityOpen,setAvailabilityOpen]=useState(false);
+ const [availabilitySlots,setAvailabilitySlots]=useState([]);
+ const [availabilitySaving,setAvailabilitySaving]=useState(false);
+ const [progression,setProgression]=useState(null);
+ const [progressionOpen,setProgressionOpen]=useState(false);
+ const [achievementUnlock,setAchievementUnlock]=useState(null);
+ const [notificationOpen,setNotificationOpen]=useState(false);
+ const [notifications,setNotifications]=useState([]);
+ const [notificationUnread,setNotificationUnread]=useState(0);
+ const [notificationPreferences,setNotificationPreferences]=useState({
+  swaps:true,messages:true,sessions:true,reviews:true,progress:true,matches:true
+ });
+ const [networkOpen,setNetworkOpen]=useState(false);
+ const [networkData,setNetworkData]=useState(null);
+ const [networkLoading,setNetworkLoading]=useState(false);
+ const [savedOpen,setSavedOpen]=useState(false);
+ const [goalsOpen,setGoalsOpen]=useState(false);
+ const [communityOpen,setCommunityOpen]=useState(false);
+ const [challengesOpen,setChallengesOpen]=useState(false);
+ const [bookmarks,setBookmarks]=useState([]);
+ const [bookmarkCollections,setBookmarkCollections]=useState([]);
+ const [circlesOpen,setCirclesOpen]=useState(false);
+ const [circles,setCircles]=useState([]);
+ const [circlesLoading,setCirclesLoading]=useState(false);
+ const [activeCircle,setActiveCircle]=useState(null);
+ const [circleMessages,setCircleMessages]=useState([]);
+ const [circleFocusId,setCircleFocusId]=useState(null);
+ const [circleOnlineIds,setCircleOnlineIds]=useState([]);
+ const [circleTypingUsers,setCircleTypingUsers]=useState([]);
+ const [universalSearchOpen,setUniversalSearchOpen]=useState(false);
+ const [universalSearchQuery,setUniversalSearchQuery]=useState("");
+ const [universalSearchData,setUniversalSearchData]=useState({people:[],skills:[],circles:[],mentors:[],counts:{}});
+ const [universalSearchLoading,setUniversalSearchLoading]=useState(false);
+ const [safetyOpen,setSafetyOpen]=useState(false);
+ const [safetyData,setSafetyData]=useState(null);
+ const [safetyLoading,setSafetyLoading]=useState(false);
+ const [moderationQueue,setModerationQueue]=useState([]);
+ const [moderationLoading,setModerationLoading]=useState(false);
+ const [reportTarget,setReportTarget]=useState(null);
+ const [reportSaving,setReportSaving]=useState(false);
+ const [reportForm,setReportForm]=useState({reason:"harassment",details:""});
+ const [dashboardData,setDashboardData]=useState(null);
+ const [dashboardLoading,setDashboardLoading]=useState(false);
  const [reviewForm,setReviewForm]=useState({
   overall_rating:5,
   teaching_quality:5,
@@ -78,26 +181,228 @@ export default function App(){
  const teachVisual=getSkillVisual(teach);
  const learnVisual=getSkillVisual(learn);
 
- useEffect(()=>{ loadCatalog(); },[]);
- useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); } },[token]);
+ useEffect(()=>{ loadCatalog(); loadCommunityUsers(); },[]);
+ useEffect(()=>{ if(token){ loadMe(); loadMySkills(); loadSwaps(); loadBookings(); loadConversations(); loadAvailability(); loadCommunityUsers(); loadProgression(false); loadNotifications(); loadNotificationPreferences(); loadDashboard(); loadBookmarks(); } },[token]);
+ useEffect(()=>{
+  if(!token) return;
+  const id=setInterval(()=>loadNotifications(false),60000);
+  return ()=>clearInterval(id);
+ },[token]);
+
+ useEffect(()=>{
+  if(!token) return;
+  let disposed=false;
+  let retryTimer=null;
+
+  function connect(){
+   const access=localStorage.getItem("skillswap_access")||token;
+   if(!access||disposed) return;
+   const socket=new WebSocket(WS_BASE+"/ws/activity/",["skillswap","skillswap.jwt."+access]);
+   activitySocketRef.current=socket;
+
+   socket.onmessage=event=>{
+    let data;
+    try{data=JSON.parse(event.data)}catch{return}
+    if(data.event==="notification"&&data.notification){
+     const item=data.notification;
+     setNotifications(prev=>{
+      const exists=prev.some(n=>n.id===item.id);
+      if(!exists&&!item.is_read) setNotificationUnread(count=>count+1);
+      return [item,...prev.filter(n=>n.id!==item.id)];
+     });
+     setNotice(item.title+(item.body?" · "+item.body:""));
+     loadConversations();
+     if(item.action_type==="booking") loadBookings();
+     if(item.action_type==="swap") loadSwaps();
+     loadDashboard();
+    }
+    if(data.event==="presence"&&data.presence){
+     const p=data.presence;
+     setPresenceByUser(prev=>({...prev,[p.user_id]:p}));
+    }
+   };
+   socket.onclose=()=>{
+    if(activitySocketRef.current===socket) activitySocketRef.current=null;
+    if(!disposed) retryTimer=setTimeout(connect,2500);
+   };
+  }
+
+  connect();
+  return ()=>{
+   disposed=true;
+   if(retryTimer) clearTimeout(retryTimer);
+   activitySocketRef.current?.close();
+   activitySocketRef.current=null;
+  };
+ },[token]);
+
+ useEffect(()=>{
+  if(!activeConversation?.partner_id) return;
+  const presence=presenceByUser[activeConversation.partner_id];
+  if(presence){
+   setChatPartnerOnline(!!presence.online);
+   setChatPartnerLastSeen(presence.last_seen||null);
+  }
+ },[activeConversation?.partner_id,presenceByUser]);
+
+ useEffect(()=>{
+  if(!chatOpen||!activeConversation?.partner_id) return;
+  if(activitySocketRef.current?.readyState===WebSocket.OPEN){
+   activitySocketRef.current.send(JSON.stringify({event:"presence_query",user_id:activeConversation.partner_id}));
+  }
+ },[activeConversation?.partner_id,chatOpen]);
+
+ useEffect(()=>{
+  if(!chatOpen||!activeConversation?.swap||!token) return;
+  let disposed=false;
+  let retryTimer=null;
+  setChatPartnerTyping(false);
+
+  function connectChat(){
+   if(disposed) return;
+   const access=localStorage.getItem("skillswap_access")||token;
+   const socket=new WebSocket(WS_BASE+"/ws/chat/"+activeConversation.swap+"/",["skillswap","skillswap.jwt."+access]);
+   chatSocketRef.current=socket;
+
+   socket.onopen=()=>{
+    socket.send(JSON.stringify({event:"read"}));
+    activitySocketRef.current?.send(JSON.stringify({event:"presence_query",user_id:activeConversation.partner_id}));
+   };
+   socket.onmessage=event=>{
+    let data;
+    try{data=JSON.parse(event.data)}catch{return}
+    if(data.event==="message"&&data.message){
+     setChatMessages(prev=>prev.some(m=>m.id===data.message.id)?prev:[...prev,data.message]);
+     if(data.message.sender!==user?.id&&socket.readyState===WebSocket.OPEN){
+      socket.send(JSON.stringify({event:"read"}));
+     }
+     loadConversations();
+    }else if(data.event==="typing"){
+     setChatPartnerTyping(!!data.typing);
+    }else if(data.event==="presence"){
+     setChatPartnerOnline(!!data.online);
+    }else if(data.event==="read"){
+     const ids=new Set(data.message_ids||[]);
+     setChatMessages(prev=>prev.map(m=>ids.has(m.id)?{...m,read_at:data.read_at}:m));
+     loadConversations();
+    }else if(data.event==="blocked"){
+     setNotice(data.detail||"This chat is no longer available.");
+     setChatOpen(false);
+     setActiveConversation(null);
+     setChatMessages([]);
+    }
+   };
+   socket.onclose=()=>{
+    if(chatSocketRef.current===socket) chatSocketRef.current=null;
+    if(!disposed) retryTimer=setTimeout(connectChat,1800);
+   };
+  }
+
+  connectChat();
+  return ()=>{
+   disposed=true;
+   if(retryTimer) clearTimeout(retryTimer);
+   chatSocketRef.current?.close();
+   chatSocketRef.current=null;
+   setChatPartnerTyping(false);
+  };
+ },[chatOpen,activeConversation?.swap,token]);
+
+ useEffect(()=>{
+  if(!circlesOpen||!activeCircle?.id||!activeCircle?.membership||!token) return;
+  let disposed=false;
+  let retryTimer=null;
+  setCircleOnlineIds([]);
+  setCircleTypingUsers([]);
+
+  function connectCircle(){
+   if(disposed) return;
+   const access=localStorage.getItem("skillswap_access")||token;
+   const socket=new WebSocket(WS_BASE+"/ws/circles/"+activeCircle.id+"/",["skillswap","skillswap.jwt."+access]);
+   circleSocketRef.current=socket;
+
+   socket.onmessage=event=>{
+    let data;
+    try{data=JSON.parse(event.data)}catch{return}
+    if(data.event==="message"&&data.message){
+     setCircleMessages(prev=>prev.some(m=>m.id===data.message.id)?prev:[...prev,data.message]);
+    }else if(data.event==="presence"){
+     setCircleOnlineIds(prev=>{
+      const next=new Set(prev);
+      if(data.online) next.add(data.user_id); else next.delete(data.user_id);
+      return Array.from(next);
+     });
+    }else if(data.event==="typing"){
+     setCircleTypingUsers(prev=>{
+      const others=prev.filter(item=>item.user_id!==data.user_id);
+      return data.typing?[...others,{user_id:data.user_id,name:data.user_name}]:others;
+     });
+    }
+   };
+   socket.onclose=()=>{
+    if(circleSocketRef.current===socket) circleSocketRef.current=null;
+    if(!disposed) retryTimer=setTimeout(connectCircle,1800);
+   };
+  }
+
+  connectCircle();
+  return ()=>{
+   disposed=true;
+   if(retryTimer) clearTimeout(retryTimer);
+   circleSocketRef.current?.close();
+   circleSocketRef.current=null;
+   setCircleOnlineIds([]);
+   setCircleTypingUsers([]);
+  };
+ },[circlesOpen,activeCircle?.id,activeCircle?.membership?.id,token]);
+
+ useEffect(()=>{
+  if(!universalSearchOpen) return;
+  const id=setTimeout(()=>runUniversalSearch(universalSearchQuery),220);
+  return ()=>clearTimeout(id);
+ },[universalSearchQuery,universalSearchOpen]);
+
+ useEffect(()=>{
+  const onKey=e=>{
+   if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="k"){
+    e.preventDefault();
+    openUniversalSearch();
+   }
+  };
+  window.addEventListener("keydown",onKey);
+  return ()=>window.removeEventListener("keydown",onKey);
+ },[]);
 
  async function refreshAccessToken(){
+  // Only one refresh may run at a time: rotating tokens invalidates the old
+  // refresh value, so overlapping API calls must share a single promise.
+  if(refreshPromiseRef.current) return refreshPromiseRef.current;
   const refresh=localStorage.getItem("skillswap_refresh");
   if(!refresh) return "";
-  try{
-   const res=await fetch(API+"/auth/token/refresh/",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({refresh})
-   });
-   if(!res.ok) return "";
-   const data=await res.json();
-   localStorage.setItem("skillswap_access",data.access);
-   if(data.refresh) localStorage.setItem("skillswap_refresh",data.refresh);
-   setToken(data.access);
-   return data.access;
-  }catch{
-   return "";
+  const epoch=sessionEpochRef.current;
+  const promise=(async()=>{
+   try{
+    const res=await fetch(API+"/auth/token/refresh/",{
+     method:"POST",
+     headers:{"Content-Type":"application/json"},
+     body:JSON.stringify({refresh})
+    });
+    if(!res.ok) return "";
+    const data=await res.json();
+    if(epoch!==sessionEpochRef.current ||
+       localStorage.getItem("skillswap_refresh")!==refresh) return "";
+    if(!data.access||!data.refresh) return "";
+    localStorage.setItem("skillswap_access",data.access);
+    localStorage.setItem("skillswap_refresh",data.refresh);
+    setToken(data.access);
+    return data.access;
+   }catch{
+    return "";
+   }
+  })();
+  refreshPromiseRef.current=promise;
+  try{return await promise}finally{
+   if(refreshPromiseRef.current===promise) refreshPromiseRef.current=null;
   }
  }
 
@@ -109,7 +414,7 @@ export default function App(){
    return fetch(API+path,{...options,headers});
   };
 
-  const access=token||localStorage.getItem("skillswap_access")||"";
+  const access=localStorage.getItem("skillswap_access")||token||"";
   let res=await makeRequest(access);
 
   if(res.status===401 && localStorage.getItem("skillswap_refresh")){
@@ -119,11 +424,577 @@ export default function App(){
   return res;
  }
 
+ async function loadBookmarks(){
+  if(!localStorage.getItem("skillswap_access")&&!token)return;
+  try{
+   const [saved,folders]=await Promise.all([api("/bookmarks/"),api("/bookmarks/collections/")]);
+   if(saved.ok&&folders.ok){
+    setBookmarks(await saved.json());
+    setBookmarkCollections(await folders.json());
+   }
+  }catch(err){console.error("Could not load bookmarks",err)}
+ }
+ async function bookmarkAction(method,path,body){
+  const res=await api(path,{method,...(body?{body:JSON.stringify(body)}:{})});
+  if(!res.ok){
+   const data=await res.json().catch(()=>({}));
+   throw new Error(data.detail||data.non_field_errors?.[0]||"Bookmark action failed.");
+  }
+  await loadBookmarks();
+ }
+ async function saveBookmark(target_type,target_id){
+  if(!user){setAuthMode("login");setAuthOpen(true);return}
+  await bookmarkAction("POST","/bookmarks/",{target_type,target_id});
+  setNotice("Added to your saved library ♥");
+ }
+ async function removeBookmark(id){
+  await bookmarkAction("DELETE","/bookmarks/"+id+"/");
+  setNotice("Bookmark removed.");
+ }
+ async function assignBookmark(item,collectionId){
+  const ids=item.collection_ids.includes(collectionId)
+   ?item.collection_ids.filter(id=>id!==collectionId)
+   :[...item.collection_ids,collectionId];
+  await bookmarkAction("PATCH","/bookmarks/"+item.id+"/",{collection_ids:ids});
+ }
+ const bookmarkProps={bookmarks,collections:bookmarkCollections,onSave:saveBookmark,onRemove:removeBookmark,onAssign:assignBookmark};
+ 
  async function loadCatalog(){
   try{
    const res=await fetch(API+"/skills/");
    if(res.ok) setCatalog(await res.json());
   }catch{}
+ }
+
+ async function loadDashboard(){
+  if(!token && !localStorage.getItem("skillswap_access")) return;
+  setDashboardLoading(true);
+  try{
+   const res=await api("/auth/dashboard/");
+   if(res.ok) setDashboardData(await res.json());
+  }catch{}finally{
+   setDashboardLoading(false);
+  }
+ }
+
+ async function loadCommunityUsers(){
+  try{
+   const access=localStorage.getItem("skillswap_access")||"";
+   const headers=access?{Authorization:"Bearer "+access}:{};
+   const res=await fetch(API+"/auth/community/",{headers});
+   if(res.ok){
+    const data=await res.json();
+    const normalized=data.map(person=>({
+      ...person,
+      teaches:person.they_teach_me?.length
+        ? person.they_teach_me.map(s=>s.name).join(", ")
+        : person.teach_skills?.map(s=>s.name).join(", ")||"No teaching skills yet",
+      wants:person.i_teach_them?.length
+        ? person.i_teach_them.map(s=>s.name).join(", ")
+        : person.learn_skills?.map(s=>s.name).join(", ")||"No learning skills yet",
+      rating:person.average_rating||0,
+      swaps:person.completed_swaps||0,
+      preview:false
+    }));
+    setCommunityUsers(normalized);
+    if(!searched) setMatches(normalized);
+   }
+  }catch{}
+ }
+
+ async function loadSafetyCenter(){
+  if(!user) return;
+  setSafetyLoading(true);
+  try{
+   const res=await api("/auth/safety/");
+   if(res.ok) setSafetyData(await res.json());
+   if(user.is_staff){
+    setModerationLoading(true);
+    const modRes=await api("/auth/safety/moderation/");
+    if(modRes.ok) setModerationQueue(await modRes.json());
+    setModerationLoading(false);
+   }
+  }finally{
+   setSafetyLoading(false);
+  }
+ }
+
+ async function openSafetyCenter(){
+  setSafetyOpen(true);
+  await loadSafetyCenter();
+ }
+
+ function openReport(target){
+  if(!user){setAuthMode("login");setAuthOpen(true);return;}
+  setReportTarget(target);
+  setReportForm({reason:"harassment",details:""});
+ }
+
+ async function submitSafetyReport(e){
+  e.preventDefault();
+  if(!reportTarget) return;
+  setReportSaving(true);
+  try{
+   const res=await api("/auth/safety/reports/",{
+    method:"POST",
+    body:JSON.stringify({
+     target_type:reportTarget.target_type,
+     target_id:reportTarget.target_id||null,
+     reported_user:reportTarget.reported_user||null,
+     reason:reportForm.reason,
+     details:reportForm.details
+    })
+   });
+   const data=await res.json().catch(()=>({}));
+   if(!res.ok){setNotice(data.detail||"Could not submit report.");return;}
+   setReportTarget(null);
+   setNotice("Report submitted to SkillSwap Safety 🛡");
+   if(safetyOpen) await loadSafetyCenter();
+  }finally{setReportSaving(false);}
+ }
+
+ async function blockUser(userId){
+  if(!userId||userId===user?.id) return;
+  const res=await api("/auth/safety/block/"+userId+"/",{method:"POST"});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){setNotice(data.detail||"Could not block this user.");return;}
+  setPassportOpen(false);setPassport(null);
+  setMatches(prev=>prev.filter(item=>item.user_id!==userId));
+  setCommunityUsers(prev=>prev.filter(item=>item.user_id!==userId));
+  setConversations(prev=>prev.filter(item=>item.partner_id!==userId));
+  if(activeConversation?.partner_id===userId){setChatOpen(false);setActiveConversation(null);setChatMessages([]);}
+  setNotice("User blocked. They can no longer directly interact with you.");
+  await loadSafetyCenter();
+ }
+
+ async function unblockUser(userId){
+  const res=await api("/auth/safety/block/"+userId+"/",{method:"DELETE"});
+  if(res.ok){
+   setNotice("User unblocked.");
+   await loadSafetyCenter();
+   await loadCommunityUsers();
+   await loadDashboard();
+  }
+ }
+
+ async function moderateReport(id,action){
+  const payload=action==="restrict"?{days:7}:{};
+  const res=await api("/auth/safety/moderation/"+id+"/"+action+"/",{method:"POST",body:JSON.stringify(payload)});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){setNotice(data.detail||"Could not update report.");return;}
+  setModerationQueue(prev=>prev.map(item=>item.id===data.id?data:item));
+  setNotice("Moderation action applied.");
+ }
+
+ async function moderateCircleMember(circleId,userId,action){
+  const res=await api("/circles/"+circleId+"/members/"+userId+"/"+action+"/",{method:"POST"});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){setNotice(data.detail||"Could not moderate member.");return;}
+  setActiveCircle(data);
+  setCircles(prev=>prev.map(item=>item.id===data.id?data:item));
+  setNotice("Circle moderation updated.");
+ }
+
+ async function deleteCircleMessage(circleId,messageId){
+  const res=await api("/circles/"+circleId+"/messages/"+messageId+"/",{method:"DELETE"});
+  if(res.ok){
+   setCircleMessages(prev=>prev.filter(item=>item.id!==messageId));
+   setNotice("Circle message removed.");
+  }
+ }
+
+ async function runUniversalSearch(query=""){
+  setUniversalSearchLoading(true);
+  try{
+   const res=await api("/auth/search/?q="+encodeURIComponent(query));
+   if(res.ok) setUniversalSearchData(await res.json());
+  }finally{
+   setUniversalSearchLoading(false);
+  }
+ }
+
+ async function openUniversalSearch(){
+  setUniversalSearchOpen(true);
+  await runUniversalSearch("");
+ }
+
+ async function handleUniversalPerson(person){
+  setUniversalSearchOpen(false);
+  await openPassport(person.user_id);
+ }
+
+ async function handleUniversalSkill(skill){
+  setUniversalSearchOpen(false);
+  setTeach(skill.name);
+  setLearn(skill.name);
+  document.getElementById("discover")?.scrollIntoView({behavior:"smooth"});
+  setNotice("Showing SkillSwap around "+skill.name+".");
+ }
+
+ async function handleUniversalCircle(circle){
+  setUniversalSearchOpen(false);
+  setCircleFocusId(circle.id);
+  setCirclesOpen(true);
+  await loadCircles();
+  await openCircle(circle.id);
+ }
+
+ async function loadCircles(){
+  setCirclesLoading(true);
+  try{
+   const res=await api("/circles/");
+   if(res.ok) setCircles(await res.json());
+  }finally{
+   setCirclesLoading(false);
+  }
+ }
+
+ async function openSkillCircles(){
+  setCircleFocusId(null);
+  setCirclesOpen(true);
+  await loadCircles();
+ }
+
+ async function openCircle(circleId){
+  const res=await api("/circles/"+circleId+"/");
+  const data=await res.json();
+  if(!res.ok){
+   setNotice(data.detail||"Could not open this circle.");
+   return;
+  }
+  setActiveCircle(data);
+  if(data.membership){
+   const msgRes=await api("/circles/"+circleId+"/messages/");
+   if(msgRes.ok) setCircleMessages(await msgRes.json());
+   else setCircleMessages([]);
+  }else{
+   setCircleMessages([]);
+  }
+ }
+
+ async function createCircle(payload){
+  const res=await api("/circles/",{method:"POST",body:JSON.stringify(payload)});
+  const data=await res.json();
+  if(!res.ok){
+   setNotice(data.detail||"Could not create the circle.");
+   return false;
+  }
+  setCircles(prev=>[data,...prev]);
+  setActiveCircle(data);
+  setNotice("Skill Circle created 👥");
+  return true;
+ }
+
+ async function joinCircle(circleId,role="learner"){
+  if(!user){
+   setAuthMode("login");setAuthOpen(true);return;
+  }
+  const res=await api("/circles/"+circleId+"/join/",{method:"POST",body:JSON.stringify({role})});
+  const data=await res.json();
+  if(!res.ok){setNotice(data.detail||"Could not join circle.");return;}
+  setActiveCircle(data);
+  setCircles(prev=>prev.map(c=>c.id===data.id?data:c));
+  const msgRes=await api("/circles/"+circleId+"/messages/");
+  if(msgRes.ok) setCircleMessages(await msgRes.json());
+  setNotice("Joined "+data.title+" ✨");
+ }
+
+ async function leaveCircle(circleId){
+  const res=await api("/circles/"+circleId+"/leave/",{method:"POST"});
+  const data=await res.json();
+  if(!res.ok){setNotice(data.detail||"Could not leave circle.");return;}
+  setActiveCircle(data);
+  setCircles(prev=>prev.map(c=>c.id===data.id?data:c));
+  setCircleMessages([]);
+  setNotice("You left the circle.");
+ }
+
+ async function sendCircleMessage(circleId,body){
+  const socket=circleSocketRef.current;
+  if(socket&&socket.readyState===WebSocket.OPEN){
+   socket.send(JSON.stringify({event:"message",body}));
+   return;
+  }
+  const res=await api("/circles/"+circleId+"/messages/",{method:"POST",body:JSON.stringify({body})});
+  if(res.ok){
+   const data=await res.json();
+   setCircleMessages(prev=>prev.some(m=>m.id===data.id)?prev:[...prev,data]);
+  }else{
+   const data=await res.json().catch(()=>({}));
+   setNotice(data.detail||"Could not send message.");
+  }
+ }
+
+ function sendCircleTyping(typing){
+  const socket=circleSocketRef.current;
+  if(socket&&socket.readyState===WebSocket.OPEN){
+   socket.send(JSON.stringify({event:"typing",typing}));
+   if(circleTypingTimerRef.current) clearTimeout(circleTypingTimerRef.current);
+   if(typing) circleTypingTimerRef.current=setTimeout(()=>{
+    socket.readyState===WebSocket.OPEN&&socket.send(JSON.stringify({event:"typing",typing:false}));
+   },1200);
+  }
+ }
+
+ async function addCircleTask(circleId,text){
+  const res=await api("/circles/"+circleId+"/tasks/",{method:"POST",body:JSON.stringify({text})});
+  if(res.ok) await openCircle(circleId);
+ }
+
+ async function toggleCircleTask(taskId,is_done){
+  const res=await api("/circles/tasks/"+taskId+"/",{method:"PATCH",body:JSON.stringify({is_done})});
+  if(res.ok&&activeCircle) await openCircle(activeCircle.id);
+ }
+
+ async function addCircleResource(circleId,payload){
+  const res=await api("/circles/"+circleId+"/resources/",{method:"POST",body:JSON.stringify(payload)});
+  if(res.ok) await openCircle(circleId);
+  else{
+   const data=await res.json().catch(()=>({}));
+   setNotice(data.detail||"Could not share resource.");
+  }
+ }
+
+ async function scheduleCircleSession(circleId,payload){
+  const normalized={...payload,starts_at:new Date(payload.starts_at).toISOString(),duration_minutes:Number(payload.duration_minutes||60)};
+  const res=await api("/circles/"+circleId+"/sessions/",{method:"POST",body:JSON.stringify(normalized)});
+  if(res.ok){
+   await openCircle(circleId);
+   setNotice("Group session scheduled 📅");
+  }else{
+   const data=await res.json().catch(()=>({}));
+   setNotice(data.detail||"Could not schedule session.");
+  }
+ }
+
+ async function generateCircleAIPlan(circleId,payload){
+  const res=await api("/circles/"+circleId+"/ai-plan/",{method:"POST",body:JSON.stringify(payload)});
+  const data=await res.json();
+  if(!res.ok){setNotice(data.detail||"Could not generate the group roadmap.");return;}
+  setActiveCircle(data);
+  setCircles(prev=>prev.map(c=>c.id===data.id?data:c));
+  setNotice(data.ai_plan_source==="openai"?"AI group roadmap generated ✦":"Smart group roadmap generated ✦");
+ }
+
+ async function openSkillNetwork(){
+  setNetworkOpen(true);
+  if(networkData) return;
+  setNetworkLoading(true);
+  try{
+   const res=await api("/auth/network/");
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not load the Skill Network.");
+    setNetworkOpen(false);
+    return;
+   }
+   setNetworkData(data);
+  }catch{
+   setNotice("Could not load the Skill Network.");
+   setNetworkOpen(false);
+  }finally{
+   setNetworkLoading(false);
+  }
+ }
+
+ async function refreshSkillNetwork(){
+  setNetworkLoading(true);
+  try{
+   const res=await api("/auth/network/");
+   if(res.ok) setNetworkData(await res.json());
+  }finally{
+   setNetworkLoading(false);
+  }
+ }
+
+ async function loadNotifications(syncUi=true){
+  if(!token && !localStorage.getItem("skillswap_access")) return;
+  try{
+   const res=await api("/notifications/");
+   if(!res.ok) return;
+   const data=await res.json();
+   setNotifications(data.notifications||[]);
+   setNotificationUnread(data.unread_count||0);
+   if(syncUi && notificationOpen) setNotificationOpen(true);
+  }catch{}
+ }
+
+ async function loadNotificationPreferences(){
+  if(!token && !localStorage.getItem("skillswap_access")) return;
+  try{
+   const res=await api("/notifications/preferences/");
+   if(res.ok) setNotificationPreferences(await res.json());
+  }catch{}
+ }
+
+ async function markNotificationRead(item){
+  if(!item || item.is_read) return;
+  const res=await api("/notifications/"+item.id+"/read/",{method:"POST"});
+  if(res.ok){
+   setNotifications(prev=>prev.map(n=>n.id===item.id?{...n,is_read:true}:n));
+   setNotificationUnread(prev=>Math.max(0,prev-1));
+  }
+ }
+
+ async function markAllNotificationsRead(){
+  const res=await api("/notifications/read-all/",{method:"POST"});
+  if(res.ok){
+   setNotifications(prev=>prev.map(n=>({...n,is_read:true})));
+   setNotificationUnread(0);
+  }
+ }
+
+ async function updateNotificationPreference(key,value){
+  setNotificationPreferences(prev=>({...prev,[key]:value}));
+  const res=await api("/notifications/preferences/",{
+   method:"PATCH",body:JSON.stringify({[key]:value})
+  });
+  if(!res.ok) setNotificationPreferences(prev=>({...prev,[key]:!value}));
+ }
+
+ async function handleNotificationAction(item){
+  await markNotificationRead(item);
+  setNotificationOpen(false);
+
+  if(item.action_type==="message" && item.target_id){
+   await openChat(item.target_id);
+   return;
+  }
+  if(item.action_type==="swap"){
+   document.getElementById("requests")?.scrollIntoView({behavior:"smooth"});
+   return;
+  }
+  if(item.action_type==="booking"){
+   document.getElementById("bookings")?.scrollIntoView({behavior:"smooth"});
+   return;
+  }
+  if(item.action_type==="progression"){
+   await loadProgression(false);
+   setProgressionOpen(true);
+   return;
+  }
+  if(item.action_type==="passport"){
+   await openPassport(item.target_id||user?.id);
+   return;
+  }
+  if(item.action_type==="review"){
+   if(user?.id) await openPassport(user.id);
+   return;
+  }
+  if(item.action_type==="circle" && item.target_id){
+   setCirclesOpen(true);
+   await loadCircles();
+   await openCircle(item.target_id);
+  }
+ }
+
+ async function loadProgression(checkUnlock=false){
+  const currentUser=user;
+  const userId=currentUser?.id;
+  if(!userId && !localStorage.getItem("skillswap_access")) return;
+  try{
+   let resolvedId=userId;
+   if(!resolvedId){
+    const meRes=await api("/auth/me/");
+    if(!meRes.ok) return;
+    const meData=await meRes.json();
+    resolvedId=meData.id;
+   }
+
+   const res=await api("/auth/progression/"+resolvedId+"/");
+   if(!res.ok) return;
+   const data=await res.json();
+   setProgression(data);
+
+   const storageKey="skillswap_seen_achievements_"+resolvedId;
+   const raw=localStorage.getItem(storageKey);
+   const unlockedKeys=(data.unlocked||[]).map(item=>item.key);
+
+   if(raw===null){
+    localStorage.setItem(storageKey,JSON.stringify(unlockedKeys));
+   }else if(checkUnlock){
+    let seen=[];
+    try{ seen=JSON.parse(raw)||[]; }catch{}
+    const newlyUnlocked=(data.unlocked||[]).filter(item=>!seen.includes(item.key));
+    if(newlyUnlocked.length){
+     setAchievementUnlock(newlyUnlocked[0]);
+     localStorage.setItem(storageKey,JSON.stringify([...new Set([...seen,...unlockedKeys])]));
+    }
+   }
+  }catch{}
+ }
+
+ async function loadAvailability(){
+  if(!token && !localStorage.getItem("skillswap_access")) return;
+  try{
+   const res=await api("/auth/availability/");
+   if(res.ok){
+    const data=await res.json();
+    setAvailabilitySlots(data.map(slot=>({
+      ...slot,
+      start_time:String(slot.start_time).slice(0,5),
+      end_time:String(slot.end_time).slice(0,5)
+    })));
+   }
+  }catch{}
+ }
+
+ function openAvailability(){
+  if(!token){
+   setAuthMode("login");
+   setAuthOpen(true);
+   return;
+  }
+  setAvailabilityOpen(true);
+ }
+
+ async function saveAvailability(){
+  setAvailabilitySaving(true);
+  try{
+   const payload=availabilitySlots.map(slot=>({
+    weekday:Number(slot.weekday),
+    start_time:String(slot.start_time).slice(0,5),
+    end_time:String(slot.end_time).slice(0,5)
+   }));
+   const res=await api("/auth/availability/",{
+    method:"PUT",
+    body:JSON.stringify(payload)
+   });
+   const data=await res.json().catch(()=>[]);
+   if(!res.ok){
+    setNotice(data.detail||Object.values(data).flat().join(" ")||"Could not save availability.");
+    return;
+   }
+   setAvailabilitySlots(data.map(slot=>({
+    ...slot,
+    start_time:String(slot.start_time).slice(0,5),
+    end_time:String(slot.end_time).slice(0,5)
+   })));
+   setAvailabilityOpen(false);
+   setNotice("Availability saved · match scores refreshed 📅");
+   await loadCommunityUsers();
+   if(searched && mySkills.length) await findMatches(false);
+  }finally{
+   setAvailabilitySaving(false);
+  }
+ }
+
+ async function openPassport(userId){
+  setPassportLoading(true);
+  try{
+   const res=await api("/auth/passports/"+userId+"/");
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not load Skill Passport.");
+    return;
+   }
+   setPassport(data);
+   setPassportOpen(true);
+  }catch{
+   setNotice("Could not load Skill Passport.");
+  }finally{
+   setPassportLoading(false);
+  }
  }
 
  async function loadMe(){
@@ -224,6 +1095,15 @@ export default function App(){
    });
    setWorkspaceResourceForm({title:"",url:"",kind:"link"});
    setWorkspaceChecklistText("");
+   setRecapReflection(data.my_recap?.reflection||"");
+   setRecapChallenge(data.my_recap?.challenge||"");
+   setRecapConfidence(data.my_recap?.confidence||3);
+   setWorkspaceAISetup({
+    goal:data.ai_goal||data.goals||"",
+    learner_level:data.ai_learner_level||"beginner",
+    learning_style:data.ai_learning_style||"step_by_step",
+    session_count:data.ai_session_count||3
+   });
    setWorkspaceOpen(true);
   }catch{
    setNotice("Could not open workspace.");
@@ -252,6 +1132,108 @@ export default function App(){
    });
    setNotice("Workspace saved.");
   }finally{ setWorkspaceSaving(false); }
+ }
+
+ async function generateWorkspaceAIPlan(){
+  if(!workspace?.booking) return;
+  setWorkspaceAIGenerating(true);
+  try{
+   const res=await api("/workspaces/bookings/"+workspace.booking+"/ai-plan/generate/",{
+    method:"POST",
+    body:JSON.stringify(workspaceAISetup)
+   });
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not generate the learning plan.");
+    return;
+   }
+   setWorkspace(data);
+   setNotice(data.ai_plan_source==="openai"?"AI learning plan generated ✦":"Smart learning plan generated ✦");
+  }catch{
+   setNotice("Could not generate the learning plan.");
+  }finally{
+   setWorkspaceAIGenerating(false);
+  }
+ }
+
+ async function addWorkspaceAIPlanChecklist(){
+  if(!workspace?.booking) return;
+  setWorkspaceAIAddingChecklist(true);
+  try{
+   const res=await api("/workspaces/bookings/"+workspace.booking+"/ai-plan/checklist/",{method:"POST"});
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not add plan tasks.");
+    return;
+   }
+   setWorkspace(data.workspace||workspace);
+   setNotice((data.created?.length||0)+" AI plan tasks added to the shared checklist.");
+  }finally{
+   setWorkspaceAIAddingChecklist(false);
+  }
+ }
+
+ async function saveWorkspaceAIPlan(){
+  if(!workspace?.booking || !workspace?.ai_plan) return;
+  setWorkspaceAISavingPlan(true);
+  try{
+   const res=await api("/workspaces/bookings/"+workspace.booking+"/",{
+    method:"PATCH",
+    body:JSON.stringify({ai_plan:workspace.ai_plan})
+   });
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not save roadmap edits.");
+    return;
+   }
+   setWorkspace(data);
+   setNotice("AI roadmap edits saved.");
+  }finally{
+   setWorkspaceAISavingPlan(false);
+  }
+ }
+
+ async function generateSessionRecap(){
+  if(!workspace?.booking) return;
+  setRecapGenerating(true);
+  try{
+   const res=await api("/workspaces/bookings/"+workspace.booking+"/recap/generate/",{
+    method:"POST",
+    body:JSON.stringify({
+      reflection:recapReflection,
+      challenge:recapChallenge,
+      confidence:Number(recapConfidence)
+    })
+   });
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not generate your session recap.");
+    return;
+   }
+   setWorkspace(prev=>({...prev,my_recap:data}));
+   setNotice(data.source==="openai"?"AI session recap generated ✦":"Smart session recap generated ✦");
+  }catch{
+   setNotice("Could not generate your session recap.");
+  }finally{
+   setRecapGenerating(false);
+  }
+ }
+
+ async function addRecapChecklist(){
+  if(!workspace?.booking) return;
+  setRecapAddingChecklist(true);
+  try{
+   const res=await api("/workspaces/bookings/"+workspace.booking+"/recap/checklist/",{method:"POST"});
+   const data=await res.json();
+   if(!res.ok){
+    setNotice(data.detail||"Could not add recap next steps.");
+    return;
+   }
+   setWorkspace(data.workspace||workspace);
+   setNotice((data.created?.length||0)+" personalized next steps added to the checklist.");
+  }finally{
+   setRecapAddingChecklist(false);
+  }
  }
 
  async function addWorkspaceResource(){
@@ -298,18 +1280,28 @@ export default function App(){
 
  async function sendChatMessage(){
   if(!activeConversation?.swap || !chatDraft.trim()) return;
+  const body=chatDraft.trim();
+  const socket=chatSocketRef.current;
+  if(socket&&socket.readyState===WebSocket.OPEN){
+   setChatDraft("");
+   setChatSending(true);
+   socket.send(JSON.stringify({event:"typing",typing:false}));
+   socket.send(JSON.stringify({event:"message",body}));
+   setTimeout(()=>setChatSending(false),180);
+   return;
+  }
   setChatSending(true);
   try{
    const res=await api("/messages/swaps/"+activeConversation.swap+"/",{
     method:"POST",
-    body:JSON.stringify({body:chatDraft.trim()})
+    body:JSON.stringify({body})
    });
    const data=await res.json();
    if(!res.ok){
     setNotice(data.detail||"Could not send message.");
     return;
    }
-   setChatMessages(prev=>[...prev,data]);
+   setChatMessages(prev=>prev.some(m=>m.id===data.id)?prev:[...prev,data]);
    setChatDraft("");
    loadConversations();
   }catch{
@@ -317,6 +1309,118 @@ export default function App(){
   }finally{
    setChatSending(false);
   }
+ }
+
+ function sendChatTyping(typing){
+  const socket=chatSocketRef.current;
+  if(socket&&socket.readyState===WebSocket.OPEN){
+   socket.send(JSON.stringify({event:"typing",typing}));
+   if(typingTimerRef.current) clearTimeout(typingTimerRef.current);
+   if(typing) typingTimerRef.current=setTimeout(()=>{
+    socket.readyState===WebSocket.OPEN&&socket.send(JSON.stringify({event:"typing",typing:false}));
+   },1200);
+  }
+ }
+
+ async function loadScheduleSuggestions(swapId,duration=60,target="schedule"){
+  const setLoading=target==="reschedule"?setRescheduleSuggestionsLoading:setScheduleSuggestionsLoading;
+  const setItems=target==="reschedule"?setRescheduleSuggestions:setScheduleSuggestions;
+  setLoading(true);
+  try{
+   const res=await api("/bookings/swaps/"+swapId+"/suggestions/?duration="+Number(duration||60));
+   const data=await res.json();
+   if(res.ok){
+    setItems(data.suggestions||[]);
+    if(target==="schedule") setScheduleAvailabilityComplete(!!data.availability_complete);
+   }else{
+    setItems([]);
+   }
+  }catch{
+   setItems([]);
+  }finally{
+   setLoading(false);
+  }
+ }
+
+ async function openCalendar(){
+  setCalendarOpen(true);
+  const res=await api("/bookings/calendar/");
+  if(res.ok){
+   const data=await res.json();
+   setCalendarEvents(data.events||[]);
+  }
+ }
+
+ async function openCalendarBooking(bookingId){
+  setCalendarOpen(false);
+  await openWorkspace(bookingId);
+ }
+
+ async function openCalendarCircle(circleId){
+  setCalendarOpen(false);
+  setCircleFocusId(circleId);
+  setCirclesOpen(true);
+  await loadCircles();
+  await openCircle(circleId);
+ }
+
+ async function openReschedule(booking){
+  setRescheduleBooking(booking);
+  setRescheduleForm({
+   starts_at:"",
+   duration_minutes:String(booking.duration_minutes||60),
+   mode:booking.mode||"online",
+   meeting_link:booking.meeting_link||"",
+   location_note:booking.location_note||"",
+   note:""
+  });
+  setRescheduleSuggestions([]);
+  setRescheduleOpen(true);
+  await loadScheduleSuggestions(booking.swap,booking.duration_minutes||60,"reschedule");
+ }
+
+ async function submitReschedule(e){
+  e.preventDefault();
+  if(!rescheduleBooking) return;
+  const startsAt=new Date(rescheduleForm.starts_at);
+  if(Number.isNaN(startsAt.getTime())){
+   setNotice("Choose a valid new date and time.");
+   return;
+  }
+  const payload={
+   proposed_starts_at:startsAt.toISOString(),
+   proposed_duration_minutes:Number(rescheduleForm.duration_minutes),
+   proposed_mode:rescheduleForm.mode,
+   proposed_meeting_link:rescheduleForm.mode==="online"?rescheduleForm.meeting_link:"",
+   proposed_location_note:rescheduleForm.mode==="in_person"?rescheduleForm.location_note:"",
+   note:rescheduleForm.note
+  };
+  const res=await api("/bookings/"+rescheduleBooking.id+"/reschedule/",{method:"POST",body:JSON.stringify(payload)});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){
+   const conflict=data.schedule_check?.messages?.join(" ");
+   setNotice(conflict||data.detail||"Could not propose the new time.");
+   return;
+  }
+  setRescheduleOpen(false);
+  setRescheduleBooking(null);
+  setNotice("Reschedule proposal sent ↻");
+  await loadBookings();
+  await loadDashboard();
+  if(calendarOpen) await openCalendar();
+  loadDashboard();
+ }
+
+ async function handleRescheduleAction(id,action){
+  const res=await api("/bookings/reschedules/"+id+"/"+action+"/",{method:"POST"});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){
+   setNotice(data.detail||"Could not update the reschedule proposal.");
+   return;
+  }
+  setBookings(prev=>prev.map(item=>item.id===data.id?data:item));
+  setNotice(action==="accept"?"New session time accepted 📅":action==="decline"?"Reschedule proposal declined.":"Reschedule proposal cancelled.");
+  if(calendarOpen) await openCalendar();
  }
 
  function openSchedule(swap){
@@ -329,7 +1433,10 @@ export default function App(){
    location_note:"",
    note:""
   });
+  setScheduleError("");
+  setScheduleSuggestions([]);
   setScheduleOpen(true);
+  loadScheduleSuggestions(swap.id,60,"schedule");
  }
 
  async function submitBooking(e){
@@ -356,11 +1463,14 @@ export default function App(){
    setScheduleOpen(false);
    setSelectedSwap(null);
    setNotice("Session scheduled 📅");
+   loadDashboard();
    setTimeout(()=>document.getElementById("bookings")?.scrollIntoView({behavior:"smooth"}),50);
   }else{
    const data=await res.json().catch(()=>({}));
-   const details=Object.values(data).flat().join(" ");
-   setNotice(details||"Could not schedule the session.");
+   const conflict=(data.starts_at||[]).flat?.().join?.(" ") || data.schedule_check?.messages?.join(" ");
+   const details=conflict || data.non_field_errors?.join?.(" ") || data.detail || "Could not schedule the session.";
+   setScheduleError(details);
+   setNotice(details);
   }
  }
 
@@ -400,6 +1510,7 @@ export default function App(){
    setNotice("Review submitted ⭐");
    await loadMe();
    await loadSwaps();
+   await loadProgression(true);
   }finally{
    setReviewSaving(false);
   }
@@ -413,10 +1524,13 @@ export default function App(){
    if(action==="complete"){
     await loadSwaps();
     await loadMe();
+    await loadProgression(true);
     setNotice("Session completed 🎉");
+    loadDashboard();
     openReview(updated);
    }else{
     setNotice("Booking cancelled.");
+    loadDashboard();
    }
   }else{
    const data=await res.json().catch(()=>({}));
@@ -431,6 +1545,7 @@ export default function App(){
    setSwaps(prev=>prev.map(s=>s.id===id?updated:s));
    const copy={accept:"Swap accepted 🤝",decline:"Request declined.",cancel:"Request cancelled.",complete:"Swap completed 🎉"};
    setNotice(copy[action]||"Swap updated.");
+   loadDashboard();
   }else{
    const data=await res.json().catch(()=>({}));
    setNotice(data.detail||"Could not update the swap.");
@@ -451,6 +1566,7 @@ export default function App(){
      .join(" · ");
     throw new Error(data.detail||details||"Unable to continue.");
    }
+   sessionEpochRef.current+=1;
    localStorage.setItem("skillswap_access",data.access);
    if(data.refresh) localStorage.setItem("skillswap_refresh",data.refresh);
    setToken(data.access);
@@ -462,9 +1578,35 @@ export default function App(){
  }
 
  function logout(){
+  // Best-effort server revocation before deleting browser credentials.
+  const access=localStorage.getItem("skillswap_access")||token;
+  const refresh=localStorage.getItem("skillswap_refresh");
+  sessionEpochRef.current+=1;
+  if(access&&refresh){
+   fetch(API+"/auth/logout/",{
+    method:"POST",
+    headers:{"Content-Type":"application/json",Authorization:"Bearer "+access},
+    body:JSON.stringify({refresh}),
+    keepalive:true,
+   }).catch(()=>{});
+  }
   localStorage.removeItem("skillswap_access");
   localStorage.removeItem("skillswap_refresh");
-  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]); setChatOpen(false); setActiveConversation(null); setChatMessages([]); setWorkspaceOpen(false); setWorkspace(null); setReviewOpen(false); setReviewBooking(null); setMatches(previewMatches);
+  setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]);
+  setChatOpen(false); setActiveConversation(null); setChatMessages([]); setChatPartnerTyping(false); setChatPartnerOnline(false); setChatPartnerLastSeen(null); setPresenceByUser({});
+  setWorkspaceOpen(false); setWorkspace(null); setReviewOpen(false); setReviewBooking(null);
+  setPassportOpen(false); setPassport(null); setAvailabilityOpen(false); setAvailabilitySlots([]);
+  setProgression(null); setProgressionOpen(false); setAchievementUnlock(null);
+  setNotificationOpen(false); setNotifications([]); setNotificationUnread(0);
+  setNetworkOpen(false); setNetworkData(null);
+  setSavedOpen(false); setGoalsOpen(false); setCommunityOpen(false); setChallengesOpen(false); setBookmarks([]); setBookmarkCollections([]);
+  setCirclesOpen(false); setCircles([]); setActiveCircle(null); setCircleMessages([]); setCircleFocusId(null);
+  setScheduleOpen(false); setSelectedSwap(null); setScheduleSuggestions([]); setScheduleError("");
+  setRescheduleOpen(false); setRescheduleBooking(null); setRescheduleSuggestions([]);
+  setCalendarOpen(false); setCalendarEvents([]);
+  setUniversalSearchOpen(false); setUniversalSearchQuery(""); setUniversalSearchData({people:[],skills:[],circles:[],mentors:[],counts:{}});
+  setSafetyOpen(false); setSafetyData(null); setModerationQueue([]); setReportTarget(null);
+  setSearched(false); setMatches(communityUsers.map(person=>({...person,score:null,confidence:"",breakdown:{},reasons:[],missing:[],suggested_times:[]})));
  }
 
  async function saveProfile(e){
@@ -502,11 +1644,11 @@ export default function App(){
   if(res.ok){ setMySkills(prev=>prev.filter(s=>s.id!==id)); setNotice("Skill removed."); }
  }
 
- async function findMatches(){
+ async function findMatches(scroll=true){
   setSearched(true);
-  document.getElementById("discover")?.scrollIntoView({behavior:"smooth"});
+  if(scroll) document.getElementById("discover")?.scrollIntoView({behavior:"smooth"});
   if(!token){
-   setMatches(previewMatches);
+   setMatches(communityUsers.map(person=>({...person,score:null,confidence:"",breakdown:{},reasons:[],missing:[],suggested_times:[]})));
    setAuthMode("login");
    setAuthOpen(true);
    return;
@@ -520,16 +1662,18 @@ export default function App(){
   const res=await api("/skills/matches/");
   if(res.ok){
    const data=await res.json();
-   setMatches(data.map((m,i)=>({
+   setMatches(data.map(m=>({
     ...m,
     teaches:m.they_teach_me.map(x=>x.name).join(", ")||"Partial match",
     wants:m.i_teach_them.map(x=>x.name).join(", ")||"Partial match",
     rating:m.average_rating||0,
     swaps:m.completed_swaps||0,
-    icon:["📸","🎨","🎬","💻","🎸"][i%5],
     preview:false
    })));
-   if(!data.length) setNotice("No compatible users yet. Your profile is ready — matches will appear as the community grows.");
+   if(!data.length){
+    setNotice("No compatible users yet. Showing the wider SkillSwap community instead.");
+    await loadCommunityUsers();
+   }
   }
  }
 
@@ -574,6 +1718,7 @@ export default function App(){
    setSwaps(prev=>[created,...prev]);
    setProposalOpen(false);
    setNotice("Swap proposal sent 🎉");
+   loadDashboard();
   }else{
    const data=await res.json().catch(()=>({}));
    setNotice(data.detail||data.non_field_errors?.[0]||"Could not send proposal.");
@@ -585,37 +1730,207 @@ export default function App(){
  return <main className="app">
   {notice && <button className="toast" onClick={()=>setNotice("")}>{notice} ×</button>}
 
-  <nav className="nav glass">
-   <a className="brand" href="#top"><span>↔</span>SkillSwap</a>
-   <div className="links">
-    <a href="#discover">Discover</a>
-    {user && <a className="request-nav-link" href="#requests">Requests{swaps.filter(s=>s.recipient===user.id&&s.status==="proposed").length>0&&<span>{swaps.filter(s=>s.recipient===user.id&&s.status==="proposed").length}</span>}</a>}
-    {user && <a href="#bookings">Bookings</a>}
-    {user && <button className="nav-message-button" onClick={()=>{
+  <nav className="nav glass nav-refined">
+   <a className="brand" href="#top"><span>↔</span><b>SkillSwap</b></a>
+
+   <div className="links nav-main-links">
+    <a className="nav-primary-link" href="#discover">Discover</a>
+
+    {user && <a className="nav-primary-link request-nav-link" href="#requests">
+      Requests
+      {swaps.filter(s=>s.recipient===user.id&&s.status==="proposed").length>0 &&
+       <span>{swaps.filter(s=>s.recipient===user.id&&s.status==="proposed").length}</span>}
+    </a>}
+
+    {user && <a className="nav-primary-link" href="#bookings">Bookings</a>}
+
+    {user && <button className="nav-primary-link nav-message-button" onClick={()=>{
       const first=conversations[0];
       if(first) openChat(first.swap);
       else setNotice("Your messages will appear after you accept a SkillSwap.");
     }}>
       Messages
       {conversations.reduce((sum,c)=>sum+(c.unread_count||0),0)>0 &&
-        <span>{conversations.reduce((sum,c)=>sum+(c.unread_count||0),0)}</span>}
+       <span>{conversations.reduce((sum,c)=>sum+(c.unread_count||0),0)}</span>}
     </button>}
-    <a href="#how">How it works</a>
-    <a href="#community">Community</a>
+
+    <details className="nav-dropdown nav-explore" onToggle={e=>{
+      if(e.currentTarget.open){
+       document.querySelectorAll(".nav-dropdown[open]").forEach(item=>{
+        if(item!==e.currentTarget) item.removeAttribute("open");
+       });
+      }
+     }}>
+      <summary>Explore <span>⌄</span></summary>
+      <div className="nav-dropdown-menu nav-explore-menu">
+       <div className="nav-dropdown-label">EXPLORE SKILLSWAP</div>
+       <a href="#how" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}>
+        <span className="nav-menu-icon">✦</span>
+        <span><b>How it works</b><small>See the SkillSwap journey</small></span>
+       </a>
+       <a href="#community" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}>
+        <span className="nav-menu-icon">👥</span>
+        <span><b>Community</b><small>Browse people and skills</small></span>
+       </a>
+       <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openSkillNetwork();}}>
+        <span className="nav-menu-icon">🕸</span>
+        <span><b>Skill Network</b><small>Explore the knowledge graph</small></span>
+       </button>
+       <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openSkillCircles();}}>
+        <span className="nav-menu-icon">👥</span>
+        <span><b>Skill Circles</b><small>Learn together in small groups</small></span>
+       </button>
+      </div>
+    </details>
    </div>
-   <div className="actions">
+
+   <div className="actions nav-actions">
+    <details className="nav-dropdown nav-compact-menu" onToggle={e=>{
+     if(e.currentTarget.open){
+      document.querySelectorAll(".nav-dropdown[open]").forEach(item=>{
+       if(item!==e.currentTarget)item.removeAttribute("open");
+      });
+     }
+    }}>
+     <summary className="nav-compact-trigger"><span>☰</span><b>Menu</b></summary>
+     <div className="nav-dropdown-menu nav-compact-dropdown">
+      <div className="nav-dropdown-label">NAVIGATION</div>
+      <a href="#discover" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><span className="nav-menu-icon">✦</span><span><b>Discover</b><small>Find new skill matches</small></span></a>
+      {user&&<a href="#requests" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><span className="nav-menu-icon">↗</span><span><b>Requests</b><small>Manage your swaps</small></span></a>}
+      {user&&<a href="#bookings" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><span className="nav-menu-icon">📅</span><span><b>Bookings</b><small>Your scheduled sessions</small></span></a>}
+      {user&&<button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");if(conversations[0])openChat(conversations[0].swap);else setNotice("Messages will appear after accepting a SkillSwap.");}}><span className="nav-menu-icon">💬</span><span><b>Messages</b><small>Chat with your partners</small></span></button>}
+      {user&&<button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setGoalsOpen(true);}}><span className="nav-menu-icon">🎯</span><span><b>Goals</b><small>Learning milestones</small></span></button>}
+      {user&&<button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setChallengesOpen(true);}}><span className="nav-menu-icon">🏆</span><span><b>Challenges</b><small>Learning streaks</small></span></button>}
+      {user&&<button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setCommunityOpen(true);}}><span className="nav-menu-icon">💜</span><span><b>Community</b><small>Social learning feed</small></span></button>}
+      {user&&<button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setSavedOpen(true);}}><span className="nav-menu-icon">♡</span><span><b>Saved</b><small>Your saved items</small></span></button>}
+      <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openSkillCircles();}}><span className="nav-menu-icon">👥</span><span><b>Skill Circles</b><small>Group learning</small></span></button>
+      <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openSkillNetwork();}}><span className="nav-menu-icon">🕸</span><span><b>Skill Network</b><small>Explore connections</small></span></button>
+     </div>
+    </details>
+    <button className="nav-search-button" onClick={openUniversalSearch} aria-label="Search SkillSwap">
+      <span>⌕</span><b>Search</b><kbd>⌘ K</kbd>
+    </button>
     {user ? <>
-      <button className="ghost" onClick={()=>setProfileOpen(true)}>My profile</button>
-      <span className="welcome">Hi, {user.first_name||user.username}</span>
-      <button className="ghost" onClick={logout}>Log out</button>
+      <details className="nav-dropdown nav-learning" onToggle={e=>{
+       if(e.currentTarget.open){
+        document.querySelectorAll(".nav-dropdown[open]").forEach(item=>{
+         if(item!==e.currentTarget)item.removeAttribute("open");
+        });
+       }
+      }}>
+       <summary className="nav-learning-trigger"><span>✦</span> My Learning <span className="nav-chevron">⌄</span></summary>
+       <div className="nav-dropdown-menu nav-learning-menu">
+        <div className="nav-dropdown-label">YOUR LEARNING SPACE</div>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setGoalsOpen(true);}}>
+         <span className="nav-menu-icon">🎯</span><span><b>Learning Goals</b><small>Milestones and progress</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setChallengesOpen(true);}}>
+         <span className="nav-menu-icon">🏆</span><span><b>Challenges</b><small>Streaks, rewards and badges</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setCommunityOpen(true);}}>
+         <span className="nav-menu-icon">💜</span><span><b>Community Feed</b><small>Updates and shared projects</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setSavedOpen(true);}}>
+         <span className="nav-menu-icon">♡</span><span><b>Saved Library</b><small>Bookmarks and collections</small></span>
+        </button>
+       </div>
+      </details>
+      <button className="notification-bell nav-icon-button" onClick={()=>{setNotificationOpen(true);loadNotifications();}} aria-label="Notifications">
+       <span className="notification-bell-icon">🔔</span>
+       {notificationUnread>0 && <b>{notificationUnread>99?"99+":notificationUnread}</b>}
+      </button>
+
+      <details className="nav-dropdown nav-account" onToggle={e=>{
+       if(e.currentTarget.open){
+        document.querySelectorAll(".nav-dropdown[open]").forEach(item=>{
+         if(item!==e.currentTarget) item.removeAttribute("open");
+        });
+       }
+      }}>
+       <summary>
+        <span className="nav-account-avatar">
+         {user.profile?.avatar_url
+          ? <img src={user.profile.avatar_url} alt="" />
+          : <span>{(user.first_name||user.username||"S").slice(0,1).toUpperCase()}</span>}
+        </span>
+        <span className="nav-account-copy">
+         <small>Signed in as</small>
+         <b>{user.first_name||user.username}</b>
+        </span>
+        <span className="nav-chevron">⌄</span>
+       </summary>
+
+       <div className="nav-dropdown-menu nav-account-menu">
+        <div className="nav-account-menu-head">
+         <div className="nav-account-avatar large">
+          {user.profile?.avatar_url
+           ? <img src={user.profile.avatar_url} alt="" />
+           : <span>{(user.first_name||user.username||"S").slice(0,1).toUpperCase()}</span>}
+         </div>
+         <div>
+          <b>{user.first_name||user.username}</b>
+          <small>@{user.username}</small>
+         </div>
+        </div>
+
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setProfileOpen(true);}}>
+         <span className="nav-menu-icon">👤</span>
+         <span><b>My profile</b><small>Skills, availability and details</small></span>
+        </button>
+        <button disabled={passportLoading} onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openPassport(user.id);}}>
+         <span className="nav-menu-icon">🛂</span>
+         <span><b>Skill Passport</b><small>Your learning identity</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setCommunityOpen(true);}}>
+         <span className="nav-menu-icon">💜</span>
+         <span><b>Community</b><small>Share progress and celebrate learning</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setChallengesOpen(true);}}>
+         <span className="nav-menu-icon">🏆</span>
+         <span><b>Learning Challenges</b><small>Challenges, badges and learning streaks</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setGoalsOpen(true);}}>
+         <span className="nav-menu-icon">🎯</span>
+         <span><b>Learning Goals</b><small>Your goals and milestones</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");setSavedOpen(true);}}>
+         <span className="nav-menu-icon">♡</span>
+         <span><b>Saved</b><small>Bookmarks and collections</small></span>
+        </button>
+        <button onClick={e=>{e.currentTarget.closest("details")?.removeAttribute("open");openSafetyCenter();}}>
+         <span className="nav-menu-icon">🛡</span>
+         <span><b>Safety Center</b><small>Blocks, reports and account standing</small></span>
+        </button>
+        <button className="nav-logout-item" onClick={logout}>
+         <span className="nav-menu-icon">↪</span>
+         <span><b>Log out</b><small>Sign out of SkillSwap</small></span>
+        </button>
+       </div>
+      </details>
     </> : <>
-      <button className="ghost" onClick={()=>{setAuthMode("login");setAuthOpen(true)}}>Log in</button>
-      <button className="primary" onClick={()=>{setAuthMode("register");setAuthOpen(true)}}>Join SkillSwap</button>
+      <button className="ghost nav-login-button" onClick={()=>{setAuthMode("login");setAuthOpen(true)}}>Log in</button>
+      <button className="primary nav-join-button" onClick={()=>{setAuthMode("register");setAuthOpen(true)}}>Join SkillSwap</button>
     </>}
    </div>
   </nav>
 
-  <section id="top" className="hero">
+  {user && <HomeDashboard
+    user={user}
+    data={dashboardData}
+    loading={dashboardLoading}
+    onRefresh={loadDashboard}
+    onCalendar={openCalendar}
+    onWorkspace={openWorkspace}
+    onChat={openChat}
+    onRequests={()=>document.getElementById("requests")?.scrollIntoView({behavior:"smooth"})}
+    onCircle={openCalendarCircle}
+    onProposal={openProposal}
+    onProgression={()=>setProgressionOpen(true)}
+    onDiscover={()=>findMatches(true)}
+    onPassport={openPassport}
+  />}
+
+  {!user && <section id="top" className="hero">
    <div className="copy">
     <div className="eyebrow">✦ LEARNING POWERED BY PEOPLE</div>
     <h1>Swap skills.<br/><span>Grow together.</span></h1>
@@ -713,7 +2028,7 @@ export default function App(){
       <div className="msh-podium msh-podium-orange"></div>
     </div>
    </div>
-  </section>
+  </section>}
 
   {user && <section className="profile-strip glass">
     <div>
@@ -722,10 +2037,25 @@ export default function App(){
       <p>{user.profile?.bio||"Tell people what you enjoy teaching and what you want to learn."}</p>
       <div className="profile-actions">
        <button className="outline" onClick={()=>setProfileOpen(true)}>Edit profile</button>
+       <button className="outline" onClick={openAvailability}>📅 Weekly availability</button>
+       <button className="outline progression-profile-button" onClick={()=>setProgressionOpen(true)} disabled={!progression}>
+        {progression ? progression.level.icon+" Level "+progression.level.level+" · "+progression.level.name : "🏆 Progression"}
+       </button>
+       <button className="outline passport-profile-button" disabled={passportLoading} onClick={()=>openPassport(user.id)}>🛂 View Skill Passport</button>
        <button className="primary" onClick={()=>setSkillsOpen(true)}>Manage my skills</button>
       </div>
     </div>
     <div className="profile-reputation-wrap">
+      {progression && <button className="profile-level-card" onClick={()=>setProgressionOpen(true)}>
+        <div className="profile-level-icon">{progression.level.icon}</div>
+        <div className="profile-level-copy">
+          <small>LEVEL {progression.level.level}</small>
+          <b>{progression.level.name}</b>
+          <div className="profile-level-track"><i style={{width:progression.level_progress+"%"}}></i></div>
+          <span>{progression.xp.toLocaleString()} XP · 🔥 {progression.current_streak} week streak</span>
+        </div>
+        <em>→</em>
+      </button>}
       <div className="profile-meta">
         <span>📍 {user.profile?.location||"Location not set"}</span>
         <span>🔄 {user.profile?.session_preference||"both"}</span>
@@ -768,22 +2098,40 @@ export default function App(){
     <button className="outline" onClick={openSkills}>Explore all skills ↗</button>
    </div>
 
-   {matches.length ? <div className="cards">{matches.map((m,i)=><article className="card glass" key={(m.user_id||m.name)+"-"+i}>
-    <div className="avatar">{m.icon}</div>
-    <div className="row"><h3>{m.name}</h3><span>{m.score}% match</span></div>
-    <p><b>Can teach you</b> {m.teaches}</p>
-    <p><b>You can teach</b> {m.wants}</p>
-    <small>⭐ {m.rating} · {m.swaps} successful swaps</small>
-    {m.preview || (m.i_teach_them?.length && m.they_teach_me?.length)
-      ? <button className="primary mini" onClick={()=>openProposal(m)}>Propose swap ↗</button>
-      : <button className="outline mini partial-match-button" onClick={()=>openProposal(m)}>One-way match · Add mutual skill</button>}
-   </article>)}</div> :
+   {matches.length ? <div className="smart-match-grid">
+    {matches.map(match=><SmartMatchCard
+      key={match.user_id}
+      match={match}
+      user={user}
+      onProposal={openProposal}
+      onPassport={openPassport}
+      onAvailability={openAvailability}
+      bookmarkProps={bookmarkProps}
+      onNotice={message=>{
+        if(!user && message.startsWith("Log in")){
+          setAuthMode("login");
+          setAuthOpen(true);
+        }
+        setNotice(message);
+      }}
+    />)}
+   </div> :
    <div className="empty-state glass"><div>🧭</div><h3>No matches yet</h3><p>Add more teach/learn skills to improve your chances.</p><button className="primary" onClick={()=>setSkillsOpen(true)}>Add skills</button></div>}
   </section>
 
   {user && <RequestsPanel swaps={swaps} bookings={bookings} currentUserId={user.id} currentUser={user} onAction={handleSwapAction} onSchedule={openSchedule} onMessage={openChat} />}
 
-  {user && <BookingsPanel bookings={bookings} currentUser={user} onAction={handleBookingAction} onMessage={openChat} onWorkspace={openWorkspace} onReview={openReview} />}
+  {user && <BookingsPanel
+    bookings={bookings}
+    currentUser={user}
+    onAction={handleBookingAction}
+    onMessage={openChat}
+    onWorkspace={openWorkspace}
+    onReview={openReview}
+    onReschedule={openReschedule}
+    onRescheduleAction={handleRescheduleAction}
+    onCalendar={openCalendar}
+  />}
 
   <section id="how" className="how glass">
    <div className="eyebrow">THREE SIMPLE MOVES</div><h2>Your knowledge is your currency.</h2>
@@ -855,9 +2203,161 @@ export default function App(){
     swap={selectedSwap}
     form={bookingForm}
     setForm={setBookingForm}
-    onClose={()=>{setScheduleOpen(false);setSelectedSwap(null)}}
+    suggestions={scheduleSuggestions}
+    suggestionsLoading={scheduleSuggestionsLoading}
+    availabilityComplete={scheduleAvailabilityComplete}
+    scheduleError={scheduleError}
+    onRefreshSuggestions={duration=>loadScheduleSuggestions(selectedSwap.id,duration,"schedule")}
+    onClose={()=>{setScheduleOpen(false);setSelectedSwap(null);setScheduleError("")}}
     onSubmit={submitBooking}
   />}
+
+  <RescheduleModal
+    booking={rescheduleOpen?rescheduleBooking:null}
+    form={rescheduleForm}
+    setForm={setRescheduleForm}
+    suggestions={rescheduleSuggestions}
+    loadingSuggestions={rescheduleSuggestionsLoading}
+    onRefreshSuggestions={duration=>rescheduleBooking&&loadScheduleSuggestions(rescheduleBooking.swap,duration,"reschedule")}
+    onClose={()=>{setRescheduleOpen(false);setRescheduleBooking(null)}}
+    onSubmit={submitReschedule}
+  />
+
+  <CalendarPanel
+    open={calendarOpen}
+    events={calendarEvents}
+    onClose={()=>setCalendarOpen(false)}
+    onOpenBooking={openCalendarBooking}
+    onOpenCircle={openCalendarCircle}
+  />
+
+  <LearningChallenges open={challengesOpen} onClose={()=>setChallengesOpen(false)} api={api} onOpenGoals={()=>setGoalsOpen(true)} onOpenCommunity={()=>setCommunityOpen(true)} />
+
+  <CommunityFeed open={communityOpen} onClose={()=>setCommunityOpen(false)} api={api} user={user} />
+
+  <LearningGoals open={goalsOpen} onClose={()=>setGoalsOpen(false)} api={api} catalog={catalog} />
+
+  <SavedPanel open={savedOpen} onClose={()=>{setSavedOpen(false);loadBookmarks()}} token={token} api={api} catalog={catalog} people={communityUsers} circles={circles} />
+
+  <UniversalSearch
+    open={universalSearchOpen}
+    query={universalSearchQuery}
+    setQuery={setUniversalSearchQuery}
+    data={universalSearchData}
+    loading={universalSearchLoading}
+    onClose={()=>setUniversalSearchOpen(false)}
+    onPerson={handleUniversalPerson}
+    onSkill={handleUniversalSkill}
+    onCircle={handleUniversalCircle}
+    onPropose={match=>{setUniversalSearchOpen(false);openProposal(match);}}
+    currentUser={user}
+    bookmarkProps={bookmarkProps}
+  />
+
+  <SkillCircles
+    open={circlesOpen}
+    circles={circles}
+    loading={circlesLoading}
+    catalog={catalog}
+    user={user}
+    activeCircle={activeCircle}
+    messages={circleMessages}
+    onClose={()=>{setCirclesOpen(false);setCircleFocusId(null)}}
+    onCreate={createCircle}
+    onOpenCircle={openCircle}
+    onJoin={joinCircle}
+    onLeave={leaveCircle}
+    onSendMessage={sendCircleMessage}
+    onTyping={sendCircleTyping}
+    onlineMemberIds={circleOnlineIds}
+    typingUsers={circleTypingUsers}
+    onAddTask={addCircleTask}
+    onToggleTask={toggleCircleTask}
+    onAddResource={addCircleResource}
+    onScheduleSession={scheduleCircleSession}
+    onGenerateAIPlan={generateCircleAIPlan}
+    onPassport={openPassport}
+    onModerateMember={moderateCircleMember}
+    onDeleteMessage={deleteCircleMessage}
+    onReport={openReport}
+    focusCircleId={circleFocusId}
+    bookmarkProps={bookmarkProps}
+  />
+
+  <SkillNetwork
+    open={networkOpen}
+    data={networkData}
+    loading={networkLoading}
+    onClose={()=>setNetworkOpen(false)}
+    onPassport={openPassport}
+    onPropose={openProposal}
+    currentUser={user}
+    onRefresh={refreshSkillNetwork}
+  />
+
+  <NotificationCenter
+    open={notificationOpen}
+    notifications={notifications}
+    unreadCount={notificationUnread}
+    preferences={notificationPreferences}
+    onClose={()=>setNotificationOpen(false)}
+    onMarkRead={markNotificationRead}
+    onMarkAllRead={markAllNotificationsRead}
+    onAction={handleNotificationAction}
+    onPreferenceChange={updateNotificationPreference}
+  />
+
+  <ProgressionPanel
+    open={progressionOpen}
+    progression={progression}
+    onClose={()=>setProgressionOpen(false)}
+  />
+
+  <AchievementUnlock
+    achievement={achievementUnlock}
+    onClose={()=>setAchievementUnlock(null)}
+  />
+
+  <AvailabilityModal
+    open={availabilityOpen}
+    slots={availabilitySlots}
+    setSlots={setAvailabilitySlots}
+    onClose={()=>setAvailabilityOpen(false)}
+    onSave={saveAvailability}
+    saving={availabilitySaving}
+  />
+
+  <SkillPassport
+    open={passportOpen}
+    passport={passport}
+    currentUserId={user?.id}
+    onBlock={blockUser}
+    bookmarkProps={bookmarkProps}
+    onReport={openReport}
+    onClose={()=>{setPassportOpen(false);setPassport(null)}}
+  />
+
+  <SafetyCenter
+    open={safetyOpen}
+    data={safetyData}
+    loading={safetyLoading}
+    isStaff={!!user?.is_staff}
+    moderationQueue={moderationQueue}
+    moderationLoading={moderationLoading}
+    onClose={()=>setSafetyOpen(false)}
+    onUnblock={unblockUser}
+    onRefresh={loadSafetyCenter}
+    onModerationAction={moderateReport}
+  />
+
+  <ReportModal
+    target={reportTarget}
+    form={reportForm}
+    setForm={setReportForm}
+    onClose={()=>setReportTarget(null)}
+    onSubmit={submitSafetyReport}
+    saving={reportSaving}
+  />
 
   <ReviewModal
     booking={reviewOpen ? reviewBooking : null}
@@ -885,6 +2385,25 @@ export default function App(){
     onToggleChecklist={toggleWorkspaceChecklist}
     onDeleteChecklist={deleteWorkspaceChecklist}
     saving={workspaceSaving}
+    aiSetup={workspaceAISetup}
+    setAiSetup={setWorkspaceAISetup}
+    onGenerateAIPlan={generateWorkspaceAIPlan}
+    aiGenerating={workspaceAIGenerating}
+    onAddAIPlanChecklist={addWorkspaceAIPlanChecklist}
+    aiAddingChecklist={workspaceAIAddingChecklist}
+    onPlanChange={plan=>setWorkspace(prev=>({...prev,ai_plan:plan}))}
+    onSaveAIPlan={saveWorkspaceAIPlan}
+    aiSavingPlan={workspaceAISavingPlan}
+    recapReflection={recapReflection}
+    setRecapReflection={setRecapReflection}
+    recapChallenge={recapChallenge}
+    setRecapChallenge={setRecapChallenge}
+    recapConfidence={recapConfidence}
+    setRecapConfidence={setRecapConfidence}
+    onGenerateRecap={generateSessionRecap}
+    recapGenerating={recapGenerating}
+    onAddRecapChecklist={addRecapChecklist}
+    recapAddingChecklist={recapAddingChecklist}
   />
 
   <ChatPanel
@@ -897,6 +2416,11 @@ export default function App(){
     onClose={()=>setChatOpen(false)}
     onSend={sendChatMessage}
     onRefresh={refreshActiveChat}
+    onTyping={sendChatTyping}
+    partnerTyping={chatPartnerTyping}
+    partnerOnline={chatPartnerOnline}
+    partnerLastSeen={chatPartnerLastSeen}
+    onReport={openReport}
     sending={chatSending}
     booking={activeConversation ? bookings.find(b=>b.swap===activeConversation.swap && b.status==="scheduled") : null}
   />

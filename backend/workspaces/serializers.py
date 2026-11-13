@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import SessionWorkspace, WorkspaceResource, WorkspaceChecklistItem
+from .models import SessionWorkspace, WorkspaceResource, WorkspaceChecklistItem, SessionRecap
 
 class WorkspaceResourceSerializer(serializers.ModelSerializer):
     added_by_name = serializers.SerializerMethodField()
@@ -40,16 +40,19 @@ class SessionWorkspaceSerializer(serializers.ModelSerializer):
     partner_name = serializers.SerializerMethodField()
     learn_skill_name = serializers.SerializerMethodField()
     teach_skill_name = serializers.SerializerMethodField()
+    my_recap = serializers.SerializerMethodField()
 
     class Meta:
         model = SessionWorkspace
         fields = [
             "id", "booking", "booking_status", "swap_id", "partner_name",
             "learn_skill_name", "teach_skill_name", "goals", "lesson_plan",
-            "shared_notes", "progress_percentage", "resources", "checklist",
+            "shared_notes", "progress_percentage", "ai_plan", "ai_plan_source", "ai_goal",
+            "ai_learner_level", "ai_learning_style", "ai_session_count", "ai_plan_updated_at",
+            "resources", "checklist", "my_recap",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["booking", "created_at", "updated_at"]
+        read_only_fields = ["booking", "ai_plan_source", "ai_plan_updated_at", "created_at", "updated_at"]
 
     def _request_user(self):
         request = self.context.get("request")
@@ -80,7 +83,24 @@ class SessionWorkspaceSerializer(serializers.ModelSerializer):
             return swap.offered_skill.name
         return swap.offered_skill.name if swap.requester == user else swap.requested_skill.name
 
+    def get_my_recap(self, obj):
+        user = self._request_user()
+        if not user:
+            return None
+        recap = obj.recaps.filter(user=user).first()
+        return SessionRecapSerializer(recap).data if recap else None
+
     def validate_progress_percentage(self, value):
         if value < 0 or value > 100:
             raise serializers.ValidationError("Progress must be between 0 and 100.")
         return value
+
+
+class SessionRecapSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SessionRecap
+        fields = [
+            "id", "reflection", "challenge", "confidence", "recap",
+            "source", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "source", "created_at", "updated_at"]

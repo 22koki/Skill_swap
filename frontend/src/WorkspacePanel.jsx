@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getSkillVisual } from "./skillVisuals";
+import AISessionPlanner from "./AISessionPlanner";
+import SessionRecap from "./SessionRecap";
 
 export default function WorkspacePanel({
   open,
@@ -18,8 +20,30 @@ export default function WorkspacePanel({
   onToggleChecklist,
   onDeleteChecklist,
   saving,
+  aiSetup,
+  setAiSetup,
+  onGenerateAIPlan,
+  aiGenerating,
+  onAddAIPlanChecklist,
+  aiAddingChecklist,
+  onPlanChange,
+  onSaveAIPlan,
+  aiSavingPlan,
+  recapReflection,
+  setRecapReflection,
+  recapChallenge,
+  setRecapChallenge,
+  recapConfidence,
+  setRecapConfidence,
+  onGenerateRecap,
+  recapGenerating,
+  onAddRecapChecklist,
+  recapAddingChecklist,
 }){
   const [tab,setTab]=useState("plan");
+  useEffect(()=>{
+    if(open && workspace) setTab(workspace.booking_status==="completed"?"recap":"plan");
+  },[open,workspace?.booking]);
   if(!open || !workspace) return null;
 
   const learn=getSkillVisual(workspace.learn_skill_name);
@@ -30,6 +54,8 @@ export default function WorkspacePanel({
   const effectiveProgress=Math.max(Number(form.progress_percentage||0),checklistProgress);
 
   const tabs=[
+    ["ai","✦ AI Plan"],
+    ["recap","✦ Recap"],
     ["plan","Plan"],
     ["checklist","Checklist"],
     ["resources","Resources"],
@@ -73,6 +99,37 @@ export default function WorkspacePanel({
         </div>
 
         <div className="workspace-body">
+          {tab==="recap" && (
+            <SessionRecap
+              workspace={workspace}
+              reflection={recapReflection}
+              setReflection={setRecapReflection}
+              challenge={recapChallenge}
+              setChallenge={setRecapChallenge}
+              confidence={recapConfidence}
+              setConfidence={setRecapConfidence}
+              onGenerate={onGenerateRecap}
+              generating={recapGenerating}
+              onAddChecklist={onAddRecapChecklist}
+              addingChecklist={recapAddingChecklist}
+            />
+          )}
+
+          {tab==="ai" && (
+            <AISessionPlanner
+              workspace={workspace}
+              setup={aiSetup}
+              setSetup={setAiSetup}
+              onGenerate={onGenerateAIPlan}
+              generating={aiGenerating}
+              onAddChecklist={onAddAIPlanChecklist}
+              addingChecklist={aiAddingChecklist}
+              onPlanChange={onPlanChange}
+              onSavePlan={onSaveAIPlan}
+              savingPlan={aiSavingPlan}
+            />
+          )}
+
           {tab==="plan" && (
             <div className="workspace-grid">
               <label className="workspace-field">

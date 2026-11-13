@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from users.models import Profile
+from users.matching import build_match_data
+from users.safety import hidden_user_ids
 from .models import Skill, SkillCategory, UserSkill
 from .serializers import SkillSerializer, SkillCategorySerializer, UserSkillSerializer
 
@@ -45,34 +47,16 @@ class MatchListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        mine = UserSkill.objects.filter(user=request.user).select_related("skill")
-        my_teach_ids = set(mine.filter(kind=UserSkill.Kind.TEACH).values_list("skill_id", flat=True))
-        my_learn_ids = set(mine.filter(kind=UserSkill.Kind.LEARN).values_list("skill_id", flat=True))
-
-        if not my_teach_ids and not my_learn_ids:
+        mine = UserSkill.objects.filter(user=request.user)
+        if not mine.exists():
             return Response([])
 
-        candidate_ids = UserSkill.objects.filter(
-            Q(kind=UserSkill.Kind.TEACH, skill_id__in=my_learn_ids) |
-            Q(kind=UserSkill.Kind.LEARN, skill_id__in=my_teach_ids)
-        ).exclude(user=request.user).values_list("user_id", flat=True).distinct()
-
+        hidden_ids = hidden_user_ids(request.user)
         results = []
-        for user in User.objects.filter(id__in=candidate_ids):
-            their = UserSkill.objects.filter(user=user).select_related("skill")
-            their_teach_ids = set(their.filter(kind=UserSkill.Kind.TEACH).values_list("skill_id", flat=True))
-            their_learn_ids = set(their.filter(kind=UserSkill.Kind.LEARN).values_list("skill_id", flat=True))
-
-            they_teach_me = my_learn_ids & their_teach_ids
-            i_teach_them = my_teach_ids & their_learn_ids
-
-            # A true two-way exchange is the strongest match.
-            if they_teach_me and i_teach_them:
-                score = 100
-            elif they_teach_me or i_teach_them:
-                score = 60
-            else:
-                score = 0
+        for user in User.objects.exclude(pk=request.user.pk).exclude(pk__in=hidden_ids):
+            match = build_match_data(request.user, user)
+            if match["score"] <= 0 and not match["they_teach_me"] and not match["i_teach_them"]:
+                continue
 
             profile, _ = Profile.objects.get_or_create(user=user)
             results.append({
@@ -82,11 +66,11 @@ class MatchListView(APIView):
                 "avatar_url": profile.avatar_url,
                 "location": profile.location,
                 "average_rating": float(profile.average_rating),
+                "review_count": profile.review_count,
                 "completed_swaps": profile.completed_swaps,
-                "score": score,
-                "they_teach_me": list(Skill.objects.filter(id__in=they_teach_me).values("id", "name")),
-                "i_teach_them": list(Skill.objects.filter(id__in=i_teach_them).values("id", "name")),
+                **match,
             })
 
         results.sort(key=lambda item: (-item["score"], -item["average_rating"], -item["completed_swaps"]))
         return Response(results)
+
