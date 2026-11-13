@@ -1,11 +1,12 @@
 from django.urls import path
-from .auth_views import ThrottledTokenObtainPairView, ThrottledTokenRefreshView
+from .auth_views import ThrottledTokenObtainPairView, ThrottledTokenRefreshView, LogoutView
 from .views import RegisterView, MeView, PublicProfileView, CommunityUsersView, SkillPassportView, MyAvailabilityView, UserProgressionView, SkillNetworkView, UniversalSearchView, BlockedUsersView, UserBlockView, SafetyReportCreateView, MySafetyView, ModerationQueueView, ModerationReportActionView, HomeDashboardView
 
 urlpatterns = [
     path("register/", RegisterView.as_view(), name="register"),
     path("login/", ThrottledTokenObtainPairView.as_view(), name="login"),
     path("token/refresh/", ThrottledTokenRefreshView.as_view(), name="token-refresh"),
+    path("logout/", LogoutView.as_view(), name="logout"),
     path("me/", MeView.as_view(), name="me"),
     path("dashboard/", HomeDashboardView.as_view(), name="home-dashboard"),
     path("profiles/<int:user_id>/", PublicProfileView.as_view(), name="public-profile"),

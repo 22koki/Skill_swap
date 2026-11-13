@@ -181,7 +181,7 @@ class ActivityConsumer(AsyncJsonWebsocketConsumer):
 
         await self.channel_layer.group_add(self.user_group, self.channel_name)
         await self.channel_layer.group_add(self.presence_group, self.channel_name)
-        await self.accept()
+        await self.accept(subprotocol="skillswap" if "skillswap" in self.scope.get("subprotocols", []) else None)
 
         await presence_connect(user)
         await self.channel_layer.group_send(
@@ -250,7 +250,7 @@ class DirectChatConsumer(AsyncJsonWebsocketConsumer):
         self.group_name = f"chat_{self.swap_id}"
         self.partner_id = swap.recipient_id if swap.requester_id == user.id else swap.requester_id
         await self.channel_layer.group_add(self.group_name, self.channel_name)
-        await self.accept()
+        await self.accept(subprotocol="skillswap" if "skillswap" in self.scope.get("subprotocols", []) else None)
 
         await self.channel_layer.group_send(
             self.group_name,
@@ -366,7 +366,7 @@ class CircleChatConsumer(AsyncJsonWebsocketConsumer):
 
         self.group_name = f"circle_{self.circle_id}"
         await self.channel_layer.group_add(self.group_name, self.channel_name)
-        await self.accept()
+        await self.accept(subprotocol="skillswap" if "skillswap" in self.scope.get("subprotocols", []) else None)
 
         await self.channel_layer.group_send(
             self.group_name,
