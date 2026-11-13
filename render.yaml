@@ -4,8 +4,10 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
-    preDeployCommand: python manage.py migrate
-    startCommand: daphne -b 0.0.0.0 -p $PORT config.asgi:application
+    # Single-instance beta: migrations execute before the server starts.
+    # For multi-instance or zero-downtime production, use a paid pre-deploy
+    # migration job instead of startup migrations.
+    startCommand: sh -c 'python manage.py migrate --noinput && exec daphne -b 0.0.0.0 -p "$PORT" config.asgi:application'
     healthCheckPath: /api/health/
     envVars:
       - key: PYTHON_VERSION
