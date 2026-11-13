@@ -2209,7 +2209,7 @@ export default function App(){
 
   <LearningGoals open={goalsOpen} onClose={()=>setGoalsOpen(false)} api={api} catalog={catalog} />
 
-  <SavedPanel open={savedOpen} onClose={()=>{setSavedOpen(false);loadBookmarks()}} token={token} catalog={catalog} people={communityUsers} circles={circles} />
+  <SavedPanel open={savedOpen} onClose={()=>{setSavedOpen(false);loadBookmarks()}} token={token} api={api} catalog={catalog} people={communityUsers} circles={circles} />
 
   <UniversalSearch
     open={universalSearchOpen}

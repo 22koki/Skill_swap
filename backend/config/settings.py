@@ -131,6 +131,11 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ),
+    "DEFAULT_THROTTLE_RATES": {
+        "auth_login": os.getenv("SKILLSWAP_LOGIN_THROTTLE", "10/min"),
+        "auth_register": os.getenv("SKILLSWAP_REGISTER_THROTTLE", "5/hour"),
+        "auth_refresh": os.getenv("SKILLSWAP_REFRESH_THROTTLE", "30/min"),
+    },
 }
 
 
@@ -141,8 +146,18 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": False,
 }
 
-
+# Rate limits must share cache across production workers.
 REDIS_URL = os.getenv("REDIS_URL", "").strip()
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+            "KEY_PREFIX": "skillswap",
+        }
+    }
+elif not DEBUG:
+    raise ImproperlyConfigured("Redis is required for production throttling.")
 if REDIS_URL:
     CHANNEL_LAYERS = {
         "default": {

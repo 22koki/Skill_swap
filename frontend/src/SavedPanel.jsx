@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import "./SavedPanel.css";
 
-const API = "http://127.0.0.1:8000/api";
 const types = [{value:"all",label:"All saved"},{value:"user",label:"Mentors"},{value:"skill",label:"Skills"},{value:"circle",label:"Circles"}];
 const icons = {user:"👤",skill:"✦",circle:"◎"};
 
-export default function SavedPanel({open,onClose,token,catalog=[],people=[],circles=[]}){
+export default function SavedPanel({open,onClose,token,api,catalog=[],people=[],circles=[]}){
  const [items,setItems]=useState([]);
  const [collections,setCollections]=useState([]);
  const [name,setName]=useState("");
@@ -18,8 +17,7 @@ export default function SavedPanel({open,onClose,token,catalog=[],people=[],circ
  const [loading,setLoading]=useState(false);
 
  async function call(path,options={}){
-  const access=localStorage.getItem("skillswap_access")||token;
-  const response=await fetch(API+path,{...options,headers:{"Authorization":"Bearer "+access,"Content-Type":"application/json",...options.headers}});
+  const response=await api(path,options);
   if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.detail||data.name?.[0]||JSON.stringify(data).slice(0,240));}
   return response.status===204?null:response.json();
  }

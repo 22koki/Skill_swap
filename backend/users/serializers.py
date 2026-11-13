@@ -33,6 +33,16 @@ class UserSerializer(serializers.ModelSerializer):
         profile.save()
         return instance
 
+class PublicUserSerializer(serializers.ModelSerializer):
+    """Public account details only. Never expose email or staff privileges."""
+    profile = ProfileSerializer(read_only=True)
+
+    class Meta:
+        model = User
+        fields = ["id", "username", "first_name", "last_name", "profile"]
+        read_only_fields = fields
+
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
 

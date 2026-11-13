@@ -3,14 +3,17 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.throttling import ScopedRateThrottle
 
 from .models import Profile, AvailabilitySlot, UserBlock, SafetyReport, AccountStanding
-from .serializers import RegisterSerializer, UserSerializer, AvailabilitySlotSerializer, UserBlockSerializer, SafetyReportSerializer, AccountStandingSerializer
+from .serializers import RegisterSerializer, UserSerializer, PublicUserSerializer, AvailabilitySlotSerializer, UserBlockSerializer, SafetyReportSerializer, AccountStandingSerializer
 from .matching import build_match_data
 from .progression import build_progression
 from .safety import hidden_user_ids, is_blocked_between
 
 class RegisterView(generics.CreateAPIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_register"
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
 
@@ -38,9 +41,11 @@ class PublicProfileView(APIView):
 
     def get(self, request, user_id):
         from django.contrib.auth.models import User
-        user = get_object_or_404(User, pk=user_id)
+        user = get_object_or_404(User, pk=user_id, is_active=True)
+        if request.user.is_authenticated and is_blocked_between(request.user, user):
+            return Response({"detail": "This profile is unavailable."}, status=403)
         Profile.objects.get_or_create(user=user)
-        return Response(UserSerializer(user).data)
+        return Response(PublicUserSerializer(user).data)
 
 
 class CommunityUsersView(APIView):

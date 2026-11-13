@@ -125,6 +125,20 @@ class SkillCircleSerializer(serializers.ModelSerializer):
             "created_at", "updated_at",
         ]
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        member = bool(
+            request and request.user.is_authenticated
+            and (instance.created_by_id == request.user.id or instance.memberships.filter(user=request.user).exists())
+        )
+        if not member:
+            # Public discovery should not reveal meeting links, private study
+            # resources or internal AI plans before a user joins a Circle.
+            for key in ("sessions", "tasks", "resources", "next_session", "ai_plan", "ai_plan_source", "ai_plan_updated_at"):
+                data.pop(key, None)
+        return data
+
     def get_creator_name(self, obj):
         return obj.created_by.get_full_name() or obj.created_by.username
 
