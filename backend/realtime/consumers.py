@@ -72,11 +72,16 @@ def get_swap_for_user(swap_id, user):
 
 @database_sync_to_async
 def create_direct_message(swap_id, user, body):
-    swap = Swap.objects.select_related("requester", "recipient").get(pk=swap_id)
-    conversation, _ = Conversation.objects.get_or_create(swap=swap)
+    try:
+        swap = Swap.objects.select_related("requester", "recipient").get(pk=swap_id)
+    except Swap.DoesNotExist:
+        return None, None
+    if user.id not in (swap.requester_id, swap.recipient_id) or swap.status not in ("accepted", "completed"):
+        return None, None
     recipient = swap.recipient if swap.requester_id == user.id else swap.requester
     if interaction_block_reason(user, recipient):
         return None, None
+    conversation, _ = Conversation.objects.get_or_create(swap=swap)
     recipient_presence = UserPresence.objects.filter(user=recipient).first()
     delivered_at = timezone.now() if recipient_presence and recipient_presence.connection_count > 0 else None
     message = Message.objects.create(
@@ -115,8 +120,14 @@ def create_direct_message(swap_id, user, body):
 @database_sync_to_async
 def mark_direct_read(swap_id, user):
     try:
-        conversation = Conversation.objects.get(swap_id=swap_id)
+        conversation = Conversation.objects.select_related("swap__requester", "swap__recipient").get(swap_id=swap_id)
     except Conversation.DoesNotExist:
+        return []
+    swap = conversation.swap
+    if user.id not in (swap.requester_id, swap.recipient_id) or swap.status not in ("accepted", "completed"):
+        return []
+    partner = swap.recipient if swap.requester_id == user.id else swap.requester
+    if interaction_block_reason(user, partner):
         return []
     qs = conversation.messages.exclude(sender=user).filter(read_at__isnull=True)
     ids = list(qs.values_list("id", flat=True))
@@ -138,9 +149,12 @@ def get_circle_for_user(circle_id, user):
 
 @database_sync_to_async
 def create_circle_message(circle_id, user, body):
-    circle = SkillCircle.objects.get(pk=circle_id)
+    try:
+        circle = SkillCircle.objects.select_related("created_by").get(pk=circle_id)
+    except SkillCircle.DoesNotExist:
+        return None
     membership = CircleMember.objects.filter(circle=circle, user=user).first()
-    if not membership or getattr(membership, "is_muted", False):
+    if not membership or membership.is_muted or interaction_block_reason(user, circle.created_by):
         return None
     message = CircleMessage.objects.create(circle=circle, sender=user, body=body)
     profile = getattr(user, "profile", None)
@@ -200,7 +214,10 @@ class ActivityConsumer(AsyncJsonWebsocketConsumer):
     async def receive_json(self, content, **kwargs):
         event = content.get("event")
         if event == "presence_query":
-            user_id = int(content.get("user_id") or 0)
+            try:
+                user_id = int(content.get("user_id") or 0)
+            except (ValueError, TypeError):
+                return
             if user_id and await can_view_presence(self.user, user_id):
                 await self.send_json({
                     "event": "presence",
@@ -259,6 +276,11 @@ class DirectChatConsumer(AsyncJsonWebsocketConsumer):
 
     async def receive_json(self, content, **kwargs):
         event = content.get("event")
+        if event not in {"message", "typing", "read"}:
+            return
+        if not await get_swap_for_user(self.swap_id, self.user):
+            await self.close(code=4403)
+            return
         if event == "message":
             body = str(content.get("body", "")).strip()
             if not body or len(body) > 2000:
@@ -350,6 +372,11 @@ class CircleChatConsumer(AsyncJsonWebsocketConsumer):
 
     async def receive_json(self, content, **kwargs):
         event = content.get("event")
+        if event not in {"message", "typing"}:
+            return
+        if not await get_circle_for_user(self.circle_id, self.user):
+            await self.close(code=4403)
+            return
         if event == "message":
             body = str(content.get("body", "")).strip()
             if not body or len(body) > 3000:
