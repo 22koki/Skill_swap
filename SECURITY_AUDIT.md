@@ -9,13 +9,23 @@
 5. **Members-only session details** — public Circle discovery hides full session schedules with meeting links, internal resources, tasks, and AI plans unless the viewer is a member or creator.
 6. **Session-aware Saved panel** — uses the app's central API helper, including access-token refresh and deployment-configured API host.
 
+## Phase 2 — Private conversations, bookings and WebSockets
+
+7. **Booking integrity** — existing bookings cannot be reassigned to a different swap with PATCH. Nonparticipants continue to be excluded by filtered querysets.
+8. **Valid booking transitions** — cancelled sessions cannot be marked complete and future sessions cannot be prematurely completed.
+9. **WebSocket write authorization** — private swap message creation revalidates both participants, swap status and block restrictions after the initial handshake; Circle messages revalidate membership, mute state and owner block restrictions.
+10. **Revoked WebSocket access** — direct/circle chat message, read/typing and outbound event handlers recheck whether the active user still has access; revoked connections are closed.
+11. **Permission regression tests** — tests cover outsider access to bookings and conversations, blocked chat, invalid booking state changes, rejected nonparticipant WebSocket writes, and Circle membership.
+
+**Limitations:** These tests validate API and server-side message helpers. A live multi-browser WebSocket exercise, simultaneous booking action race tests and production load/abuse testing are still required.
+
 ## Verification
 
 From `backend` run:
 
 ```powershell
 python manage.py check
-python manage.py test users.test_security circles.test_security
+python manage.py test users.test_security circles.test_security bookings.test_security messaging.test_security realtime.test_security
 python manage.py test
 ```
 
