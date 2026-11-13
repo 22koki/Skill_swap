@@ -90,6 +90,8 @@ export default function App(){
  const [chatPartnerOnline,setChatPartnerOnline]=useState(false);
  const [chatPartnerLastSeen,setChatPartnerLastSeen]=useState(null);
  const [presenceByUser,setPresenceByUser]=useState({});
+ const refreshPromiseRef=useRef(null);
+ const sessionEpochRef=useRef(0);
  const activitySocketRef=useRef(null);
  const chatSocketRef=useRef(null);
  const circleSocketRef=useRef(null);
@@ -372,22 +374,35 @@ export default function App(){
  },[]);
 
  async function refreshAccessToken(){
+  // Only one refresh may run at a time: rotating tokens invalidates the old
+  // refresh value, so overlapping API calls must share a single promise.
+  if(refreshPromiseRef.current) return refreshPromiseRef.current;
   const refresh=localStorage.getItem("skillswap_refresh");
   if(!refresh) return "";
-  try{
-   const res=await fetch(API+"/auth/token/refresh/",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({refresh})
-   });
-   if(!res.ok) return "";
-   const data=await res.json();
-   localStorage.setItem("skillswap_access",data.access);
-   if(data.refresh) localStorage.setItem("skillswap_refresh",data.refresh);
-   setToken(data.access);
-   return data.access;
-  }catch{
-   return "";
+  const epoch=sessionEpochRef.current;
+  const promise=(async()=>{
+   try{
+    const res=await fetch(API+"/auth/token/refresh/",{
+     method:"POST",
+     headers:{"Content-Type":"application/json"},
+     body:JSON.stringify({refresh})
+    });
+    if(!res.ok) return "";
+    const data=await res.json();
+    if(epoch!==sessionEpochRef.current ||
+       localStorage.getItem("skillswap_refresh")!==refresh) return "";
+    if(!data.access||!data.refresh) return "";
+    localStorage.setItem("skillswap_access",data.access);
+    localStorage.setItem("skillswap_refresh",data.refresh);
+    setToken(data.access);
+    return data.access;
+   }catch{
+    return "";
+   }
+  })();
+  refreshPromiseRef.current=promise;
+  try{return await promise}finally{
+   if(refreshPromiseRef.current===promise) refreshPromiseRef.current=null;
   }
  }
 
@@ -399,7 +414,7 @@ export default function App(){
    return fetch(API+path,{...options,headers});
   };
 
-  const access=token||localStorage.getItem("skillswap_access")||"";
+  const access=localStorage.getItem("skillswap_access")||token||"";
   let res=await makeRequest(access);
 
   if(res.status===401 && localStorage.getItem("skillswap_refresh")){
@@ -1551,6 +1566,7 @@ export default function App(){
      .join(" · ");
     throw new Error(data.detail||details||"Unable to continue.");
    }
+   sessionEpochRef.current+=1;
    localStorage.setItem("skillswap_access",data.access);
    if(data.refresh) localStorage.setItem("skillswap_refresh",data.refresh);
    setToken(data.access);
@@ -1562,6 +1578,18 @@ export default function App(){
  }
 
  function logout(){
+  // Best-effort server revocation before deleting browser credentials.
+  const access=localStorage.getItem("skillswap_access")||token;
+  const refresh=localStorage.getItem("skillswap_refresh");
+  sessionEpochRef.current+=1;
+  if(access&&refresh){
+   fetch(API+"/auth/logout/",{
+    method:"POST",
+    headers:{"Content-Type":"application/json",Authorization:"Bearer "+access},
+    body:JSON.stringify({refresh}),
+    keepalive:true,
+   }).catch(()=>{});
+  }
   localStorage.removeItem("skillswap_access");
   localStorage.removeItem("skillswap_refresh");
   setToken(""); setUser(null); setMySkills([]); setSwaps([]); setBookings([]); setConversations([]);
