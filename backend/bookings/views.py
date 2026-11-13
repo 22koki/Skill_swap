@@ -66,11 +66,17 @@ class BookingActionView(APIView):
             return Response({"detail": "You are not part of this booking."}, status=403)
 
         if action == "cancel":
+            if booking.status != Booking.Status.SCHEDULED:
+                return Response({"detail": "Only scheduled sessions can be cancelled."}, status=400)
             booking.status = Booking.Status.CANCELLED
             partner = booking.swap.recipient if booking.swap.requester == request.user else booking.swap.requester
             notify(partner, Notification.Kind.SESSION, "A SkillSwap session was cancelled", "Open the swap to plan a new time.", actor=request.user, action_type="booking", target_id=booking.id, dedupe_key=f"booking-cancelled:{booking.id}")
         elif action == "complete":
-            if booking.status != Booking.Status.COMPLETED:
+            if booking.status != Booking.Status.SCHEDULED:
+                return Response({"detail": "Only scheduled sessions can be completed."}, status=400)
+            if booking.starts_at > timezone.now():
+                return Response({"detail": "A future session cannot be marked complete."}, status=400)
+            if booking.status == Booking.Status.SCHEDULED:
                 booking.status = Booking.Status.COMPLETED
                 booking.swap.status = "completed"
                 booking.swap.save(update_fields=["status", "updated_at"])
