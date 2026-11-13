@@ -197,7 +197,7 @@ export default function App(){
   function connect(){
    const access=localStorage.getItem("skillswap_access")||token;
    if(!access||disposed) return;
-   const socket=new WebSocket(WS_BASE+"/ws/activity/?token="+encodeURIComponent(access));
+   const socket=new WebSocket(WS_BASE+"/ws/activity/",["skillswap","skillswap.jwt."+access]);
    activitySocketRef.current=socket;
 
    socket.onmessage=event=>{
@@ -261,7 +261,7 @@ export default function App(){
   function connectChat(){
    if(disposed) return;
    const access=localStorage.getItem("skillswap_access")||token;
-   const socket=new WebSocket(WS_BASE+"/ws/chat/"+activeConversation.swap+"/?token="+encodeURIComponent(access));
+   const socket=new WebSocket(WS_BASE+"/ws/chat/"+activeConversation.swap+"/",["skillswap","skillswap.jwt."+access]);
    chatSocketRef.current=socket;
 
    socket.onopen=()=>{
@@ -318,7 +318,7 @@ export default function App(){
   function connectCircle(){
    if(disposed) return;
    const access=localStorage.getItem("skillswap_access")||token;
-   const socket=new WebSocket(WS_BASE+"/ws/circles/"+activeCircle.id+"/?token="+encodeURIComponent(access));
+   const socket=new WebSocket(WS_BASE+"/ws/circles/"+activeCircle.id+"/",["skillswap","skillswap.jwt."+access]);
    circleSocketRef.current=socket;
 
    socket.onmessage=event=>{
