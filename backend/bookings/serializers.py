@@ -20,6 +20,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "location_note", "note", "status", "review_status", "pending_reschedule", "created_at", "updated_at",
         ]
         read_only_fields = ["status", "created_at", "updated_at"]
+        extra_kwargs = {"swap": {"required": True}}
 
     def _partner(self, obj):
         request = self.context.get("request")
@@ -77,6 +78,10 @@ class BookingSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         request = self.context["request"]
         swap = attrs.get("swap") or getattr(self.instance, "swap", None)
+        if swap is None:
+            raise serializers.ValidationError({"swap": "A swap is required."})
+        if self.instance and "swap" in attrs and attrs["swap"].pk != self.instance.swap_id:
+            raise serializers.ValidationError({"swap": "An existing booking cannot be transferred to another swap."})
         starts_at = attrs.get("starts_at") or getattr(self.instance, "starts_at", None)
 
         if request.user not in {swap.requester, swap.recipient}:
