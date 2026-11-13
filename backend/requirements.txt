@@ -9,3 +9,5 @@ openai>=2.0
 
 channels[daphne]>=4.3,<5
 channels-redis>=4.2,<5
+
+whitenoise>=6.8,<7
