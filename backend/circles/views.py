@@ -1,6 +1,9 @@
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
+
+from users.safety import hidden_user_ids
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -26,8 +29,9 @@ def circle_for_user(request, circle_id, require_member=False):
         SkillCircle.objects.select_related("primary_skill", "primary_skill__category", "created_by"),
         pk=circle_id,
     )
-    if not circle.is_public and not request.user.is_authenticated:
-        return None
+    if not circle.is_public:
+        if not request.user.is_authenticated or not (circle.created_by_id == request.user.id or circle.memberships.filter(user=request.user).exists()):
+            return None
     if require_member:
         if not request.user.is_authenticated or not circle.memberships.filter(user=request.user).exists():
             return None
@@ -47,7 +51,9 @@ class CircleListCreateView(APIView):
         circles = SkillCircle.objects.select_related(
             "primary_skill", "primary_skill__category", "created_by"
         ).prefetch_related("memberships__user", "sessions", "tasks", "resources").all()
-        if not request.user.is_authenticated:
+        if request.user.is_authenticated:
+            circles = circles.filter(Q(is_public=True) | Q(created_by=request.user) | Q(memberships__user=request.user)).exclude(created_by_id__in=hidden_user_ids(request.user)).distinct()
+        else:
             circles = circles.filter(is_public=True)
         return Response(SkillCircleSerializer(circles, many=True, context={"request": request}).data)
 
@@ -90,20 +96,18 @@ class CircleJoinView(APIView):
 
     def post(self, request, circle_id):
         circle = circle_for_user(request, circle_id)
+        if not circle:
+            return Response({"detail": "This Circle is private."}, status=403)
         safety_reason = interaction_block_reason(request.user, circle.created_by)
         if safety_reason and circle.created_by_id != request.user.id:
             return Response({"detail": "You cannot join this Circle right now."}, status=403)
-        role = str(request.data.get("role", CircleMember.Role.LEARNER))
-        if role not in {CircleMember.Role.MENTOR, CircleMember.Role.LEARNER}:
-            role = CircleMember.Role.LEARNER
+        # Membership is always learner on self-join. Mentor privileges must
+        # come from a separate authorized moderation workflow.
         membership, created = CircleMember.objects.get_or_create(
             circle=circle,
             user=request.user,
-            defaults={"role": role},
+            defaults={"role": CircleMember.Role.LEARNER},
         )
-        if not created and membership.role != role:
-            membership.role = role
-            membership.save(update_fields=["role"])
         if created and circle.created_by_id != request.user.id:
             notify(
                 circle.created_by,
@@ -123,6 +127,8 @@ class CircleLeaveView(APIView):
 
     def post(self, request, circle_id):
         circle = circle_for_user(request, circle_id)
+        if not circle:
+            return Response({"detail": "This Circle is private."}, status=403)
         if circle.created_by_id == request.user.id:
             return Response({"detail": "Circle creators cannot leave their own circle."}, status=400)
         circle.memberships.filter(user=request.user).delete()
