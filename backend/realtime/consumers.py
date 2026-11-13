@@ -311,9 +311,15 @@ class DirectChatConsumer(AsyncJsonWebsocketConsumer):
                 )
 
     async def chat_message_event(self, event):
+        if not await get_swap_for_user(self.swap_id, self.user):
+            await self.close(code=4403)
+            return
         await self.send_json({"event": "message", "message": event["message"]})
 
     async def chat_typing_event(self, event):
+        if not await get_swap_for_user(self.swap_id, self.user):
+            await self.close(code=4403)
+            return
         if event["user_id"] != self.user.id:
             await self.send_json({
                 "event": "typing",
@@ -322,6 +328,9 @@ class DirectChatConsumer(AsyncJsonWebsocketConsumer):
             })
 
     async def chat_read_event(self, event):
+        if not await get_swap_for_user(self.swap_id, self.user):
+            await self.close(code=4403)
+            return
         await self.send_json({
             "event": "read",
             "reader_id": event["reader_id"],
@@ -330,6 +339,9 @@ class DirectChatConsumer(AsyncJsonWebsocketConsumer):
         })
 
     async def chat_presence_event(self, event):
+        if not await get_swap_for_user(self.swap_id, self.user):
+            await self.close(code=4403)
+            return
         if event["user_id"] != self.user.id:
             await self.send_json({
                 "event": "presence",
@@ -399,9 +411,15 @@ class CircleChatConsumer(AsyncJsonWebsocketConsumer):
             )
 
     async def circle_message_event(self, event):
+        if not await get_circle_for_user(self.circle_id, self.user):
+            await self.close(code=4403)
+            return
         await self.send_json({"event": "message", "message": event["message"]})
 
     async def circle_typing_event(self, event):
+        if not await get_circle_for_user(self.circle_id, self.user):
+            await self.close(code=4403)
+            return
         if event["user_id"] != self.user.id:
             await self.send_json({
                 "event": "typing",
@@ -411,6 +429,9 @@ class CircleChatConsumer(AsyncJsonWebsocketConsumer):
             })
 
     async def circle_presence_event(self, event):
+        if not await get_circle_for_user(self.circle_id, self.user):
+            await self.close(code=4403)
+            return
         await self.send_json({
             "event": "presence",
             "user_id": event["user_id"],
