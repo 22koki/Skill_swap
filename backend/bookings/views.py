@@ -76,16 +76,13 @@ class BookingActionView(APIView):
                 return Response({"detail": "Only scheduled sessions can be completed."}, status=400)
             if booking.starts_at > timezone.now():
                 return Response({"detail": "A future session cannot be marked complete."}, status=400)
-            if booking.status == Booking.Status.SCHEDULED:
-                booking.status = Booking.Status.COMPLETED
-                booking.swap.status = "completed"
-                booking.swap.save(update_fields=["status", "updated_at"])
-                for user in (booking.swap.requester, booking.swap.recipient):
-                    profile, _ = Profile.objects.get_or_create(user=user)
-                    profile.completed_swaps += 1
-                    profile.save(update_fields=["completed_swaps"])
-            else:
-                return Response({"detail": "This session is already completed."}, status=400)
+            booking.status = Booking.Status.COMPLETED
+            booking.swap.status = "completed"
+            booking.swap.save(update_fields=["status", "updated_at"])
+            for user in (booking.swap.requester, booking.swap.recipient):
+                profile, _ = Profile.objects.get_or_create(user=user)
+                profile.completed_swaps += 1
+                profile.save(update_fields=["completed_swaps"])
         else:
             return Response({"detail": "Unknown booking action."}, status=400)
 
