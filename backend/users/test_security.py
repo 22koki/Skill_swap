@@ -1,7 +1,9 @@
 from django.contrib.auth.models import User
 from django.core.cache import cache
-from django.test import TestCase, override_settings
+from django.test import TestCase
+from unittest.mock import patch
 from rest_framework.test import APIClient
+from rest_framework.throttling import ScopedRateThrottle
 
 from users.models import Profile, UserBlock
 
@@ -27,18 +29,18 @@ class PublicProfilePrivacyTests(TestCase):
 
 
 class AuthThrottleTests(TestCase):
-    @override_settings(REST_FRAMEWORK={
-        "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_simplejwt.authentication.JWTAuthentication",),
-        "DEFAULT_THROTTLE_RATES": {"auth_login": "2/min", "auth_register": "2/hour", "auth_refresh": "2/min"},
-    })
     def test_login_rate_limited_after_two_attempts(self):
-        cache.clear()
-        client = APIClient()
-        try:
-            codes = [
-                client.post("/api/auth/login/", {"username": "no-account", "password": "wrong"}, format="json").status_code
-                for _ in range(3)
-            ]
-            self.assertEqual(codes[-1], 429)
-        finally:
+        # ScopedRateThrottle caches DEFAULT_THROTTLE_RATES at import time.
+        # Patching REST_FRAMEWORK with override_settings alone may therefore
+        # leave the actual throttle at its production default of 10/min.
+        with patch.dict(ScopedRateThrottle.THROTTLE_RATES, {"auth_login": "2/min"}):
             cache.clear()
+            client = APIClient()
+            try:
+                codes = [
+                    client.post("/api/auth/login/", {"username": "no-account", "password": "wrong"}, format="json").status_code
+                    for _ in range(3)
+                ]
+                self.assertEqual(codes, [401, 401, 429])
+            finally:
+                cache.clear()
