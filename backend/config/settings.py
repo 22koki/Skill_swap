@@ -28,6 +28,8 @@ INSTALLED_APPS = [
     "notifications",
     "circles",
     "bookmarks",
+    "goals",
+    "community",
 ]
 
 MIDDLEWARE = [
